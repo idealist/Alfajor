@@ -82,7 +82,7 @@ class Selenium(DOMMixin):
         self.selenium.open(url, timeout)
         if wait_for != 'page':
             self.wait_for(wait_for, timeout)
-        after_browser_activity.send(self)
+        after_browser_activity.send(self, url=url)
         self.sync_document()
 
     def reset(self):
