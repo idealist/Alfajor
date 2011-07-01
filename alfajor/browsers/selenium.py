@@ -126,6 +126,12 @@ class Selenium(DOMMixin):
                 js = ('selenium.browserbot.getCurrentWindow()'
                       '.jQuery.active == 0;')
                 self.selenium('waitForCondition', js, timeout)
+            elif condition == 'postajax':
+                # seems like the DOM gets messed up temporarily, so waiting
+                # for window.Alfajor ensures that everything is in place (?)
+                js = ('var window = selenium.browserbot.getCurrentWindow();'
+                      'window.Alfajor && window.Alfajor.postAjaxComplete == 0;')
+                self.selenium('waitForCondition', js, timeout)
             elif condition.startswith('js:'):
                 expr = condition[3:]
                 js = ('var window = selenium.browserbot.getCurrentWindow(); ' +
