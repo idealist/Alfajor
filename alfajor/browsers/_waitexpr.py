@@ -81,6 +81,14 @@ class WaitExpression(object):
         """True if no jQuery ajax requests are pending."""
         return self
 
+    def postajax_complete(self):
+        """True if 'all' ajax handlers have completed execution"""
+        """
+        TODO:eo make the above statement true, currently just a 500ms delay
+        from when the ajax request completes.
+        """
+        return self
+
     def __unicode__(self):
         """The rendered value of the expression."""
         return u''
@@ -141,6 +149,16 @@ class SeleniumWaitExpression(WaitExpression):
         js = """\
 (function() {
   var complete = window.jQuery ? window.jQuery.active == 0 : true;
+  %s
+  return complete;
+})()""" % predicate_log('ajax_complete', 'complete')
+        self._expressions.append(js)
+        return self
+    
+    def postajax_complete(self):
+        js = """\
+(function() {
+  var complete = window.Alfajor && window.Alfajor.postAjaxComplete == 0;
   %s
   return complete;
 })()""" % predicate_log('ajax_complete', 'complete')

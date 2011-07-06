@@ -228,7 +228,7 @@ class SeleniumRemote(object):
 
             if rows:
                 return dict(
-                    map(lambda x: x.strip('"'), x.split('=')) for x in rows[0])
+                    map(lambda x: x.strip('"'), x.split('=', 1)) for x in rows[0])
             else:
                 return {}
         else:
@@ -462,6 +462,9 @@ class InputElement(InputElement):
             return
         elif self.type == 'radio':
             self.browser.selenium('check', self._locator)
+            # XXX:eo selenium doesn't necessarily trigger this event for us,
+            # so do it manually
+            self.fire_event('change')
             self.attrib['checked'] = ''
             for el in self.form.inputs[self.name]:
                 if el.value != self.value:

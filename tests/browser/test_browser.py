@@ -175,6 +175,15 @@ def test_wait_for_ajax():
 
 
 @browser_test()
+def test_wait_for_postajax():
+    if 'selenium' in browser.capabilities:
+        browser.open('/waitfor')
+        browser.cssselect('#ajaxappender')[0].click(
+            wait_for='postajax', timeout=3000)
+        assert len(browser.cssselect('.ajaxAdded')) == 4
+
+
+@browser_test()
 def test_wait_for_js():
     if 'selenium' in browser.capabilities:
         browser.open('/waitfor')
