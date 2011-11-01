@@ -15,6 +15,7 @@ from urllib import urlencode
 from urlparse import urlparse, urlunparse
 from wsgiref.util import request_uri
 
+import werkzeug
 from werkzeug import BaseResponse, Headers, create_environ, run_wsgi_app
 from werkzeug.test import _TestCookieJar, encode_multipart
 
@@ -193,6 +194,8 @@ class _APIClientResponse(object):
         return APIClient(application=state.application, state=state)
 
     status_code = BaseResponse.status_code
+    if werkzeug.__version__ >= '0.8':
+        status = BaseResponse.status
 
     @property
     def request_uri(self):
