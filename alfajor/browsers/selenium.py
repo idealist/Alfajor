@@ -123,8 +123,9 @@ class Selenium(DOMMixin):
             if condition == 'page':
                 self.selenium('waitForPageToLoad', timeout)
             elif condition == 'ajax':
-                js = ('selenium.browserbot.getCurrentWindow()'
-                      '.jQuery.active == 0;')
+                # ajax has been made identical to postAjax
+                js = ('var window = selenium.browserbot.getCurrentWindow();'
+                      'window.Alfajor && window.Alfajor.postAjaxComplete == 0;')
                 self.selenium('waitForCondition', js, timeout)
             elif condition == 'postajax':
                 # seems like the DOM gets messed up temporarily, so waiting

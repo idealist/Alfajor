@@ -138,9 +138,9 @@ class SeleniumWaitExpression(WaitExpression):
     def ajax_pending(self):
         js = """\
 (function() {
-  var pending = window.jQuery && window.jQuery.active != 0;
+  var complete = window.Alfajor && window.Alfajor.postAjaxComplete != 0;
   %s
-  return pending;
+  return complete;
 })()""" % predicate_log('ajax_pending', 'complete')
         self._expressions.append(js)
         return self
@@ -148,13 +148,13 @@ class SeleniumWaitExpression(WaitExpression):
     def ajax_complete(self):
         js = """\
 (function() {
-  var complete = window.jQuery ? window.jQuery.active == 0 : true;
+  var complete = window.Alfajor && window.Alfajor.postAjaxComplete == 0;
   %s
   return complete;
 })()""" % predicate_log('ajax_complete', 'complete')
         self._expressions.append(js)
         return self
-    
+
     def postajax_complete(self):
         js = """\
 (function() {
