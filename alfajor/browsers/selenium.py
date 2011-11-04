@@ -42,6 +42,8 @@ __all__ = ['Selenium']
 logger = getLogger('tests.browser')
 after_browser_activity = signal('after_browser_activity')
 before_browser_activity = signal('before_browser_activity')
+after_page_load = signal('after_page_load')
+before_page_load = signal('before_page_load')
 _enterable_chars_re = re.compile(r'(\\[a-z]|\\\d+|.)')
 csv.register_dialect('cookies', delimiter=';',
                      skipinitialspace=True,
@@ -73,6 +75,7 @@ class Selenium(DOMMixin):
     def open(self, url, wait_for='page', timeout=None):
         logger.info('open(%s)', url)
         before_browser_activity.send(self)
+        before_page_load.send(self, url=url)
         if self._base_url:
             url = urljoin(self._base_url, url)
         if not self.selenium._session_id:
@@ -84,6 +87,7 @@ class Selenium(DOMMixin):
             self.wait_for(wait_for, timeout)
         after_browser_activity.send(self)
         self.sync_document()
+        after_page_load.send(self, url=url)
 
     def reset(self):
         self.selenium('deleteAllVisibleCookies')
