@@ -222,7 +222,9 @@ class SeleniumRemote(object):
 
             if rows:
                 return dict(
-                    map(lambda x: x.strip('"'), x.split('=')) for x in rows[0])
+                    # Transform mycookie="abc=def" into ['mycookie', 'abc=def']
+                    map(lambda x: x.strip('"'), x.split('=', 1))
+                        for x in rows[0])
             else:
                 return {}
         else:
