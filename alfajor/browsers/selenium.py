@@ -62,7 +62,7 @@ class Selenium(DOMMixin):
     wait_expression = SeleniumWaitExpression
 
     def __init__(self, server_url, browser_cmd, base_url=None,
-                 default_timeout=16000):
+                 default_timeout=16000, **kw):
         self.selenium = SeleniumRemote(
             server_url, browser_cmd, default_timeout)
         self._base_url = base_url
@@ -71,6 +71,7 @@ class Selenium(DOMMixin):
         self.status = ''
         self.response = None
         self.headers = {}
+        self.wait_expression = kw.pop('wait_expression', self.wait_expression)
 
     def open(self, url, wait_for='page', timeout=None):
         logger.info('open(%s)', url)
@@ -115,6 +116,8 @@ class Selenium(DOMMixin):
         try:
             if not condition:
                 return
+            if condition == 'ajax':
+                condition = self.wait_expression(['ajax_complete'])
             if isinstance(condition, WaitExpression):
                 condition = u'js:' + unicode(condition)
 
@@ -126,10 +129,6 @@ class Selenium(DOMMixin):
                 timeout = self.selenium._current_timeout
             if condition == 'page':
                 self.selenium('waitForPageToLoad', timeout)
-            elif condition == 'ajax':
-                js = ('selenium.browserbot.getCurrentWindow()'
-                      '.jQuery.active == 0;')
-                self.selenium('waitForCondition', js, timeout)
             elif condition.startswith('js:'):
                 expr = condition[3:]
                 js = ('var window = selenium.browserbot.getCurrentWindow(); ' +
