@@ -68,6 +68,7 @@ class SeleniumManager(object):
         selenium_server = self._config('selenium-server',
                                        'http://localhost:4444')
         waitexpr = self._config('wait-expression', None)
+        kw = {}
         if waitexpr:
             kw = {'wait_expression': eval_dotted_path(waitexpr)}
         self.browser = Selenium(selenium_server, self.browser_type, base_url,

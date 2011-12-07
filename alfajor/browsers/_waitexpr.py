@@ -187,17 +187,17 @@ class JQuerySeleniumWaitExpression(SeleniumWaitExpression):
 
 
 class PrototypeSeleniumWaitExpression(SeleniumWaitExpression):
-    ajax_pending_expr = ('var pending = window.jQuery && '
-                         'Ajax.activeRequestCount != 0;')
-    ajax_complete_expr = ('var complete = window.jQuery && '
-                          'Ajax.activeRequestCount == 0;')
+    ajax_pending_expr = ('var pending = window.Ajax && '
+                         'window.Ajax.activeRequestCount != 0;')
+    ajax_complete_expr = ('var complete = window.Ajax && '
+                          'window.Ajax.activeRequestCount == 0;')
 
 
 class DojoSeleniumWaitExpression(SeleniumWaitExpression):
-    ajax_pending_expr = ('var pending = window.jQuery && '
-                         'dojo.io.XMLHTTPTransport.inFlight.length != 0;')
-    ajax_complete_expr = ('var complete = window.jQuery && '
-                          'dojo.io.XMLHTTPTransport.inFlight.length == 0;')
+    ajax_pending_expr = ('var pending = window.dojo && '
+                     'window.dojo.io.XMLHTTPTransport.inFlight.length != 0;')
+    ajax_complete_expr = ('var complete = window.dojo && '
+                      'window.dojo.io.XMLHTTPTransport.inFlight.length == 0;')
 
 
 def js_quote(string):
