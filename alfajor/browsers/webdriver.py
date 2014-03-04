@@ -8,6 +8,7 @@
 from __future__ import with_statement
 
 from contextlib import contextmanager
+import copy
 import csv
 from cStringIO import StringIO
 from functools import partial
@@ -77,10 +78,10 @@ class WebDriver(DOMMixin):
 
     wait_expression = SeleniumWaitExpression
 
-    def __init__(self, server_url, browser_cmd, base_url=None,
+    def __init__(self, server_url, browser_capabilites=None, base_url=None,
                  default_timeout=16000, **kw):
         self.webdriver = WebDriverRemote(
-            server_url, browser_cmd, default_timeout)
+            server_url, browser_capabilites, default_timeout)
         self._base_url = base_url
 
         self.status_code = 0
@@ -96,9 +97,7 @@ class WebDriver(DOMMixin):
         if self._base_url:
             url = urljoin(self._base_url, url)
         if not self.webdriver._session_id:
-            self.webdriver.get_new_browser_session(url)
-        # NOTE:err.- webdriver's open waits for the page to load before
-        # proceeding
+            self.webdriver.get_new_browser_session()
         self.webdriver.open(url, timeout)
         if wait_for != 'page':
             self.wait_for(wait_for, timeout)
@@ -122,14 +121,16 @@ class WebDriver(DOMMixin):
 
     def sync_document(self, wait_for=None, timeout=None):
         self.wait_for(wait_for, timeout)
-        self.response = '<html>' + self.webdriver('getHtmlSource') + '</html>'
+        self.response = self.webdriver('GET', 'source')['value']
         self.__dict__.pop('document', None)
 
     @property
     def location(self):
-        return self.webdriver('getLocation')
+        return self.webdriver('GET', 'url')['value']
 
     def wait_for(self, condition, timeout=None):
+        # TODO
+        return
         try:
             if not condition:
                 return
@@ -163,19 +164,20 @@ class WebDriver(DOMMixin):
     @property
     def cookies(self):
         """A dictionary of cookie names and values."""
-        return self.webdriver('getCookie', dict=True)
+        return {c.name: c for c in self.webdriver('GET', 'cookie')['value']}
 
-    def set_cookie(self, name, value, domain=None, path=None, max_age=None,
-                   session=None, expires=None, port=None):
-        if domain or session or expires or port:
-            message = "WebDriver Cookies support only path and max_age"
-            warn(message, UserWarning)
-        cookie_string = '%s=%s' % (name, value)
-        options_string = '' if not path else 'path=%s' % path
-        self.webdriver('createCookie', cookie_string, options_string)
+    def set_cookie(self, name, value, **kw):
+        max_age = kw.pop('max_age')
+        if max_age and 'expiry' not in kw:
+            kw['expiry'] = max_age
+        cookie = dict(name=name, value=value)
+        for key in ('path', 'domain', 'secure', 'expiry'):
+            if key in kw:
+                cookie[key] = kw[key]
+        self.webdriver('POST', 'cookie', cookie=cookie)
 
     def delete_cookie(self, name, domain=None, path=None):
-        self.webdriver('deleteCookie', name, path)
+        self.webdriver('DELETE', 'cookie' + '/' + name)
 
     # temporary...
     def stop(self):
@@ -188,22 +190,26 @@ class WebDriver(DOMMixin):
 
 class WebDriverRemote(object):
 
-    def __init__(self, server_url, default_timeout=None):
+    def __init__(self, server_url, browser_capabilities=None, default_timeout=None):
         self._server_url = server_url.rstrip('/') + '/wd/hub'
         self._user_agent = None
         self._session_id = None
+        self._desired_capabilities = browser_capabilities
         self._default_timeout = default_timeout
         self._current_timeout = None
         self._req_session = None
 
-    def get_new_browser_session(self, browser_name='phantomjs', **options):
+    def get_new_browser_session(self, **capabilities):
         self._req_session = requests.Session()
         self._req_session.headers.update({
             'Accept': 'application/json; charset=UTF-8',
             'Content-Type': 'application/json'
             })
-        caps = {'browserName': browser_name}
-        caps.update(options)
+        caps = copy.copy(self._desired_capabilities or {})
+        caps.update(capabilities)
+        if 'browserName' not in caps:
+            caps['browserName'] = 'phantomjs'
+
         result = self._raw_call('POST', 'session', desiredCapabilities=caps)
         self._session_id = result['sessionId']
         #self('getNewBrowserSession', self._browser_cmd,
@@ -246,7 +252,7 @@ class WebDriverRemote(object):
     def __call__(self, method, command, **kw):
         if not self._session_id:
             raise Exception('No webdriver session.')
-        endpoint = 'session/' + self._session_id + '/' + command
+        endpoint = 'session/' + self._session_id + '/' + unicode(command)
         return self._raw_call(method, endpoint, **kw)
 
         data = response[3:]
@@ -290,14 +296,14 @@ class WebDriverRemote(object):
         if value is None:
             return
         if value != self._current_timeout:
-            self('setTimeout', value)
+            self('POST', 'timeouts', type='page load', ms=value)
         self._current_timeout = value
 
     def open(self, url, timeout=None):
         with self._scoped_timeout(timeout):
             # Workaround for XHR ERROR failure on non-200 responses
             # http://code.google.com/p/webdriver/issues/detail?id=408
-            self('open', url, 'true')
+            self('POST', 'url', url=url)
 
     def wait_for_element_present(self, expression, timeout=None):
         with self._scoped_timeout(timeout):
