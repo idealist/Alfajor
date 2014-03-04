@@ -7,7 +7,8 @@
 import os
 import tempfile
 
-from werkzeug import Response, Request, Template
+from jinja2 import Template
+from werkzeug import Response, Request
 from werkzeug.exceptions import NotFound, HTTPException
 from werkzeug.routing import Map, Rule
 
@@ -51,7 +52,7 @@ class WebApp(object):
         if handler:
             handler(request, context)
         print context
-        body = template.render(context)
+        body = template.render(**context)
         return Response(body, mimetype='text/html')
 
     def results(self, request, context):

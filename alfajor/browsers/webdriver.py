@@ -105,8 +105,12 @@ class WebDriver(DOMMixin):
         self.sync_document()
         after_page_load.send(self, url=url)
 
+    @property
+    def backend(self):
+        return self.selenium
+
     def reset(self):
-        self.webdriver('deleteAllVisibleCookies')
+        self.webdriver('DELETE', 'cookie')
 
     @property
     def user_agent(self):

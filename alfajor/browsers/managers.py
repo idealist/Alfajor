@@ -8,7 +8,7 @@
 
 from logging import getLogger
 
-from alfajor.utilities import ServerSubProcess, eval_dotted_path
+from alfajor.utilities import ServerSubProcess, eval_dotted_path, lazy_property
 
 
 logger = getLogger('alfajor')
@@ -54,9 +54,12 @@ class SeleniumManager(object):
             return default[0]
         raise LookupError(key)
 
-    def create(self):
+    @lazy_property
+    def browser_factory(self):
         from alfajor.browsers.selenium import Selenium
+        return Selenium
 
+    def create(self):
         base_url = self.server_url
         if (self._config('without_server', False) or
             not self._config('cmd', False)):
@@ -71,14 +74,15 @@ class SeleniumManager(object):
         kw = {}
         if waitexpr:
             kw = {'wait_expression': eval_dotted_path(waitexpr)}
-        self.browser = Selenium(selenium_server, self.browser_type, base_url,
-                                **kw)
+
+        self.browser = self.browser_factory(selenium_server, self.browser_type,
+                                            base_url, **kw)
         return self.browser
 
     def destroy(self):
         if self.browser and self.browser.selenium._session_id:
             try:
-                self.browser.selenium.test_complete()
+                self.browser.backend.test_complete()
             except (KeyboardInterrupt, SystemExit):
                 raise
             except:
@@ -97,6 +101,14 @@ class SeleniumManager(object):
         process = ServerSubProcess(cmd, ping)
         process.start()
         return process
+
+
+class WebDriverManager(SeleniumManager):
+
+    @lazy_property
+    def browser_factory(self):
+        from alfajor.browsers.webdriver import WebDriver
+        return WebDriver
 
 
 class WSGIManager(object):
