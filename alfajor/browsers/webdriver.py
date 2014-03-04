@@ -4,17 +4,18 @@
 # This file is part of 'Alfajor' and is distributed under the BSD license.
 # See LICENSE for more details.
 
-"""Bridge to live web browsers via Selenium RC."""
+"""Bridge to live web browsers via WebDriver RC."""
 from __future__ import with_statement
 
 from contextlib import contextmanager
 import csv
 from cStringIO import StringIO
 from functools import partial
+import json
 from logging import getLogger
 import re
+import requests
 import time
-from urllib2 import urlopen, Request
 from urlparse import urljoin
 from warnings import warn
 
@@ -37,8 +38,23 @@ from alfajor.browsers._waitexpr import SeleniumWaitExpression, WaitExpression
 from alfajor.utilities import lazy_property
 from alfajor._compat import property
 
+import requests
+import logging
 
-__all__ = ['Selenium']
+# these two lines enable debugging at httplib level (requests->urllib3->httplib)
+# you will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
+# the only thing missing will be the response.body which is not logged.
+import httplib
+httplib.HTTPConnection.debuglevel = 1
+
+logging.basicConfig() # you need to initialize logging, otherwise you will not see anything from requests
+logging.getLogger().setLevel(logging.DEBUG)
+requests_log = logging.getLogger("requests.packages.urllib3")
+requests_log.setLevel(logging.DEBUG)
+requests_log.propagate = True
+
+
+__all__ = ['WebDriver']
 logger = getLogger('tests.browser')
 after_browser_activity = signal('after_browser_activity')
 before_browser_activity = signal('before_browser_activity')
@@ -50,20 +66,20 @@ csv.register_dialect('cookies', delimiter=';',
                      quoting=csv.QUOTE_NONE)
 
 
-class Selenium(DOMMixin):
+class WebDriver(DOMMixin):
 
     capabilities = [
         'cookies',
         'javascript',
         'visibility',
-        'selenium',
+        'webdriver',
         ]
 
     wait_expression = SeleniumWaitExpression
 
     def __init__(self, server_url, browser_cmd, base_url=None,
                  default_timeout=16000, **kw):
-        self.selenium = SeleniumRemote(
+        self.webdriver = WebDriverRemote(
             server_url, browser_cmd, default_timeout)
         self._base_url = base_url
 
@@ -79,11 +95,11 @@ class Selenium(DOMMixin):
         before_page_load.send(self, url=url)
         if self._base_url:
             url = urljoin(self._base_url, url)
-        if not self.selenium._session_id:
-            self.selenium.get_new_browser_session(url)
-        # NOTE:err.- selenium's open waits for the page to load before
+        if not self.webdriver._session_id:
+            self.webdriver.get_new_browser_session(url)
+        # NOTE:err.- webdriver's open waits for the page to load before
         # proceeding
-        self.selenium.open(url, timeout)
+        self.webdriver.open(url, timeout)
         if wait_for != 'page':
             self.wait_for(wait_for, timeout)
         after_browser_activity.send(self, url=url)
@@ -91,13 +107,13 @@ class Selenium(DOMMixin):
         after_page_load.send(self, url=url)
 
     def reset(self):
-        self.selenium('deleteAllVisibleCookies')
+        self.webdriver('deleteAllVisibleCookies')
 
     @property
     def user_agent(self):
-        if not self.selenium._user_agent:
+        if not self.webdriver._user_agent:
             return dict.fromkeys(('browser', 'platform', 'version'), 'unknown')
-        ua = UserAgent(self.selenium._user_agent)
+        ua = UserAgent(self.webdriver._user_agent)
         return {
             'browser': ua.browser,
             'platform': ua.platform,
@@ -106,12 +122,12 @@ class Selenium(DOMMixin):
 
     def sync_document(self, wait_for=None, timeout=None):
         self.wait_for(wait_for, timeout)
-        self.response = '<html>' + self.selenium('getHtmlSource') + '</html>'
+        self.response = '<html>' + self.webdriver('getHtmlSource') + '</html>'
         self.__dict__.pop('document', None)
 
     @property
     def location(self):
-        return self.selenium('getLocation')
+        return self.webdriver('getLocation')
 
     def wait_for(self, condition, timeout=None):
         try:
@@ -127,65 +143,73 @@ class Selenium(DOMMixin):
                     time.sleep(timeout / 1000.0)
                 return
             if timeout is None:
-                timeout = self.selenium._current_timeout
+                timeout = self.webdriver._current_timeout
             if condition == 'page':
-                self.selenium('waitForPageToLoad', timeout)
+                self.webdriver('waitForPageToLoad', timeout)
             elif condition.startswith('js:'):
                 expr = condition[3:]
-                js = ('var window = selenium.browserbot.getCurrentWindow(); ' +
+                js = ('var window = webdriver.browserbot.getCurrentWindow(); ' +
                       expr)
-                self.selenium('waitForCondition', js, timeout)
+                self.webdriver('waitForCondition', js, timeout)
             elif condition.startswith('element:'):
                 expr = condition[8:]
-                self.selenium.wait_for_element_present(expr, timeout)
+                self.webdriver.wait_for_element_present(expr, timeout)
             elif condition.startswith('!element:'):
                 expr = condition[9:]
-                self.selenium.wait_for_element_not_present(expr, timeout)
+                self.webdriver.wait_for_element_not_present(expr, timeout)
         except RuntimeError, detail:
-            raise AssertionError('Selenium encountered an error:  %s' % detail)
+            raise AssertionError('WebDriver encountered an error:  %s' % detail)
 
     @property
     def cookies(self):
         """A dictionary of cookie names and values."""
-        return self.selenium('getCookie', dict=True)
+        return self.webdriver('getCookie', dict=True)
 
     def set_cookie(self, name, value, domain=None, path=None, max_age=None,
                    session=None, expires=None, port=None):
         if domain or session or expires or port:
-            message = "Selenium Cookies support only path and max_age"
+            message = "WebDriver Cookies support only path and max_age"
             warn(message, UserWarning)
         cookie_string = '%s=%s' % (name, value)
         options_string = '' if not path else 'path=%s' % path
-        self.selenium('createCookie', cookie_string, options_string)
+        self.webdriver('createCookie', cookie_string, options_string)
 
     def delete_cookie(self, name, domain=None, path=None):
-        self.selenium('deleteCookie', name, path)
+        self.webdriver('deleteCookie', name, path)
 
     # temporary...
     def stop(self):
-        self.selenium.test_complete()
+        self.webdriver.test_complete()
 
     @lazy_property
     def _lxml_parser(self):
-        return html_parser_for(self, selenium_elements)
+        return html_parser_for(self, webdriver_elements)
 
 
-class SeleniumRemote(object):
+class WebDriverRemote(object):
 
-    def __init__(self, server_url, browser_cmd, default_timeout):
-        self._server_url = server_url.rstrip('/') + '/selenium-server/driver/'
-        self._browser_cmd = browser_cmd
+    def __init__(self, server_url, default_timeout=None):
+        self._server_url = server_url.rstrip('/') + '/wd/hub'
         self._user_agent = None
         self._session_id = None
         self._default_timeout = default_timeout
         self._current_timeout = None
+        self._req_session = None
 
-    def get_new_browser_session(self, browser_url, extension_js='', **options):
-        opts = ';'.join("%s=%s" % item for item in options.items())
-        self._session_id = self('getNewBrowserSession', self._browser_cmd,
-                                browser_url, extension_js, opts)
+    def get_new_browser_session(self, browser_name='phantomjs', **options):
+        self._req_session = requests.Session()
+        self._req_session.headers.update({
+            'Accept': 'application/json; charset=UTF-8',
+            'Content-Type': 'application/json'
+            })
+        caps = {'browserName': browser_name}
+        caps.update(options)
+        result = self._raw_call('POST', 'session', desiredCapabilities=caps)
+        self._session_id = result['sessionId']
+        #self('getNewBrowserSession', self._browser_cmd,
+        #                        browser_url, extension_js, opts)
         self.set_timeout(self._default_timeout)
-        self._user_agent = self.get_eval('navigator.userAgent')
+        #self._user_agent = self.get_eval('navigator.userAgent')
 
     getNewBrowserSession = get_new_browser_session
 
@@ -195,26 +219,35 @@ class SeleniumRemote(object):
 
     testComplete = test_complete
 
-    def __call__(self, command, *args, **kw):
-        transform = _transformers[kw.pop('transform', 'unicode')]
-        return_list = kw.pop('list', False)
-        return_dict = kw.pop('dict', False)
-        assert not kw, 'Unknown keyword argument.'
+    def _raw_call(self, method, command, *args, **kw):
+        #transform = _transformers[kw.pop('transform', 'unicode')]
+        #return_list = kw.pop('list', False)
+        #return_dict = kw.pop('dict', False)
+        #assert not kw, 'Unknown keyword argument.'
 
-        payload = {'cmd': command, 'sessionId': self._session_id}
-        for idx, arg in enumerate(args):
-            payload[str(idx + 1)] = arg
+        #payload = {'cmd': command, 'sessionId': self._session_id}
+        #for idx, arg in enumerate(args):
+        #    payload[str(idx + 1)] = arg
 
-        request = Request(self._server_url, url_encode(payload), {
-            'Content-Type':
-            'application/x-www-form-urlencoded; charset=utf-8'})
-        logger.debug('selenium(%s, %r)', command, args)
-        response = urlopen(request).read()
+        logger.debug('webdriver(%s, %r)', command, args)
+        response = self._req_session.request(
+                method, self._server_url + '/' + command, data=json.dumps(kw))
+        if not response.status_code < 300:
+            raise RuntimeError('Invalid Request: ' + response.text)
+        data = None
+        if response.status_code == 200:
+            data = response.json()
 
-        if not response.startswith('OK'):
-            raise RuntimeError(response.encode('utf-8'))
-        if response == 'OK':
-            return
+        if data and data['status'] != 0:
+            raise RuntimeError(data['message'].encode('utf-8'))
+
+        return data
+
+    def __call__(self, method, command, **kw):
+        if not self._session_id:
+            raise Exception('No webdriver session.')
+        endpoint = 'session/' + self._session_id + '/' + command
+        return self._raw_call(method, endpoint, **kw)
 
         data = response[3:]
         if return_list:
@@ -235,7 +268,7 @@ class SeleniumRemote(object):
             return transform(data)
 
     def __getattr__(self, key):
-        # proxy methods calls through to Selenium, converting
+        # proxy methods calls through to WebDriver, converting
         # python_form to camelCase
         if '_' in key:
             key = toCamelCase(key)
@@ -263,7 +296,7 @@ class SeleniumRemote(object):
     def open(self, url, timeout=None):
         with self._scoped_timeout(timeout):
             # Workaround for XHR ERROR failure on non-200 responses
-            # http://code.google.com/p/selenium/issues/detail?id=408
+            # http://code.google.com/p/webdriver/issues/detail?id=408
             self('open', url, 'true')
 
     def wait_for_element_present(self, expression, timeout=None):
@@ -320,11 +353,11 @@ def toCamelCase(string):
 
 
 def event_sender(name):
-    selenium_name = toCamelCase(name)
+    webdriver_name = toCamelCase(name)
 
     def handler(self, wait_for=None, timeout=None):
         before_browser_activity.send(self.browser)
-        self.browser.selenium(selenium_name, self._locator)
+        self.browser.webdriver(webdriver_name, self._locator)
         # XXX:dc: when would a None wait_for be a good thing?
         if wait_for:
             self.browser.wait_for(wait_for, timeout)
@@ -332,7 +365,7 @@ def event_sender(name):
         after_browser_activity.send(self.browser)
         self.browser.sync_document()
     handler.__name__ = name
-    handler.__doc__ = "Emit %s on this element." % selenium_name
+    handler.__doc__ = "Emit %s on this element." % webdriver_name
     return handler
 
 
@@ -391,21 +424,21 @@ def _fill_form_async(form, values, wait_for=None, timeout=None):
 
 
 def type_text(element, text, wait_for=None, timeout=0, allow_newlines=False):
-    # selenium.type_keys() doesn't work with non-printables like backspace
-    selenium, locator = element.browser.selenium, element._locator
+    # webdriver.type_keys() doesn't work with non-printables like backspace
+    webdriver, locator = element.browser.webdriver, element._locator
     # Store the original value
     field_value = element.value
     for char in _enterable_chars_re.findall(text):
         field_value = _append_text_value(field_value, char, allow_newlines)
         if len(char) == 1 and ord(char) < 32:
             char = r'\%i' % ord(char)
-        selenium.key_down(locator, char)
+        webdriver.key_down(locator, char)
         # Most browsers do not allow events to do the actual typing,
         # so we need to set the value
         if element.browser.user_agent['browser'] != 'firefox':
-            selenium.type(locator, field_value)
-        selenium.key_press(locator, char)
-        selenium.key_up(locator, char)
+            webdriver.type(locator, field_value)
+        webdriver.key_press(locator, char)
+        webdriver.key_up(locator, char)
     if wait_for and timeout:
         element.browser.wait_for(wait_for, timeout)
         element.browser.sync_document()
@@ -418,9 +451,9 @@ class InputElement(InputElement):
     def value(self):
         """The value= of this input."""
         if self.checkable:
-            # doesn't seem possible to mutate get value- via selenium
+            # doesn't seem possible to mutate get value- via webdriver
             return self.attrib.get('value', '')
-        return self.browser.selenium('getValue', self._locator)
+        return self.browser.webdriver('getValue', self._locator)
 
     @value.setter
     def value(self, value):
@@ -446,7 +479,7 @@ class InputElement(InputElement):
                     self.checked = bool(value)
         else:
             self.attrib['value'] = value
-            self.browser.selenium('type', self._locator, value)
+            self.browser.webdriver('type', self._locator, value)
 
     @value.deleter
     def value(self):
@@ -455,13 +488,13 @@ class InputElement(InputElement):
         else:
             if 'value' in self.attrib:
                 del self.attrib['value']
-            self.browser.selenium('type', self._locator, u'')
+            self.browser.webdriver('type', self._locator, u'')
 
     @property
     def checked(self):
         if not self.checkable:
             raise AttributeError('Not a checkable input type')
-        status = self.browser.selenium.is_checked(self._locator)
+        status = self.browser.webdriver.is_checked(self._locator)
         if status:
             self.attrib['checked'] = ''
         else:
@@ -478,19 +511,19 @@ class InputElement(InputElement):
         if self.type == 'radio' and current_state:
             return
         elif self.type == 'radio':
-            self.browser.selenium('check', self._locator)
+            self.browser.webdriver('check', self._locator)
             self.attrib['checked'] = ''
             for el in self.form.inputs[self.name]:
                 if el.value != self.value:
                     el.attrib.pop('checked', None)
         else:
             if value:
-                self.browser.selenium('check', self._locator)
+                self.browser.webdriver('check', self._locator)
                 self.attrib['checked'] = ''
             else:
-                self.browser.selenium('uncheck', self._locator)
+                self.browser.webdriver('uncheck', self._locator)
                 self.attrib.pop('checked', None)
-        # XXX:eo selenium doesn't necessarily trigger this event for us,
+        # XXX:eo webdriver doesn't necessarily trigger this event for us,
         # so do it manually
         self.fire_event('change')
 
@@ -508,12 +541,12 @@ class TextareaElement(TextareaElement):
     @property
     def value(self):
         """The value= of this input."""
-        return self.browser.selenium('getValue', self._locator)
+        return self.browser.webdriver('getValue', self._locator)
 
     @value.setter
     def value(self, value):
         self.attrib['value'] = value
-        self.browser.selenium('type', self._locator, value)
+        self.browser.webdriver('type', self._locator, value)
 
     def enter(self, text, wait_for='duration', timeout=0.1):
         type_text(self, text, wait_for, timeout, allow_newlines=True)
@@ -545,10 +578,10 @@ class SelectElement(SelectElement):
                 raise AssertionError("Option with value %r not present in "
                                      "remote document!" % val)
             if self.multiple:
-                self.browser.selenium('addSelection', self._locator,
+                self.browser.webdriver('addSelection', self._locator,
                                         option_locator)
             else:
-                self.browser.selenium('select', self._locator, option_locator)
+                self.browser.webdriver('select', self._locator, option_locator)
                 break
 
     value = property(SelectElement._value__get, _value__set)
@@ -559,7 +592,7 @@ class DOMElement(DOMElement):
 
     @property
     def _locator(self):
-        """The fastest Selenium locator expression for this element."""
+        """The fastest WebDriver locator expression for this element."""
         try:
             return 'id=' + self.attrib['id']
         except KeyError:
@@ -574,15 +607,15 @@ class DOMElement(DOMElement):
 
     def fire_event(self, name):
         before_browser_activity.send(self.browser)
-        self.browser.selenium('fireEvent', self._locator, name)
+        self.browser.webdriver('fireEvent', self._locator, name)
         after_browser_activity.send(self.browser)
 
     @property
     def is_visible(self):
-        return self.browser.selenium.is_visible(self._locator)
+        return self.browser.webdriver.is_visible(self._locator)
 
 
-selenium_elements = {
+webdriver_elements = {
     '*': DOMElement,
     'form': FormElement,
     'input': InputElement,

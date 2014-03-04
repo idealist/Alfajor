@@ -90,6 +90,7 @@ setup(name="alfajor",
         'Werkzeug >= 0.6',
         'lxml',
         'blinker',
+        'requests',
         ],
 
       tests_require=[
