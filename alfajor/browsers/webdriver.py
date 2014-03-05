@@ -162,7 +162,7 @@ class WebDriver(DOMMixin):
     @property
     def cookies(self):
         """A dictionary of cookie names and values."""
-        return {c.name: c for c in self.webdriver('GET', 'cookie')['value']}
+        return {c['name']: c['value'] for c in self.webdriver('GET', 'cookie')['value']}
 
     def set_cookie(self, name, value, **kw):
         max_age = kw.pop('max_age')
@@ -397,9 +397,11 @@ def event_sender(name):
     def handler(self, wait_for=None, timeout=None):
         before_browser_activity.send(self.browser)
         element = self.wd_id()
-        if 'click' in name:
+        if 'doubleclick' in name:
             self.browser.webdriver('POST', 'moveto', element=element)
-        self.browser.webdriver('POST', 'element/%s/%s' % (element, webdriver_name))
+            self.browser.webdriver('POST', '%s' % (element, webdriver_name))
+        else:
+            self.browser.webdriver('POST', 'element/%s/%s' % (element, webdriver_name))
         # XXX:dc: when would a None wait_for be a good thing?
         if wait_for:
             self.browser.wait_for(wait_for, timeout)
@@ -469,16 +471,11 @@ def type_text(element, text, wait_for=None, timeout=0, allow_newlines=False):
     # Store the original value
     field_value = element.value
     for char in _enterable_chars_re.findall(text):
+        # SW: Is this char at a time still necessary?
         field_value = _append_text_value(field_value, char, allow_newlines)
         if len(char) == 1 and ord(char) < 32:
             char = r'\%i' % ord(char)
-        webdriver.key_down(locator, char)
-        # Most browsers do not allow events to do the actual typing,
-        # so we need to set the value
-        if element.browser.user_agent['browser'] != 'firefox':
-            webdriver.type(locator, field_value)
-        webdriver.key_press(locator, char)
-        webdriver.key_up(locator, char)
+        webdriver('POST', 'element/%s/value' % self.wd_id(), value=[char])
     if wait_for and timeout:
         element.browser.wait_for(wait_for, timeout)
         element.browser.sync_document()
@@ -536,12 +533,8 @@ class InputElement(InputElement):
     def checked(self):
         if not self.checkable:
             raise AttributeError('Not a checkable input type')
-        status = self.browser.webdriver.is_checked(self._locator)
-        if status:
-            self.attrib['checked'] = ''
-        else:
-            self.attrib.pop('checked', None)
-        return status
+        return self.browser.webdriver('GET',
+                'element/%s/selected' % self.wd_id())['value']
 
     @checked.setter
     def checked(self, value):
@@ -553,21 +546,13 @@ class InputElement(InputElement):
         if self.type == 'radio' and current_state:
             return
         elif self.type == 'radio':
-            self.browser.webdriver('check', self._locator)
+            self.browser.webdriver('POST', 'element/%s/click' % self.wd_id())
             self.attrib['checked'] = ''
             for el in self.form.inputs[self.name]:
                 if el.value != self.value:
                     el.attrib.pop('checked', None)
         else:
-            if value:
-                self.browser.webdriver('check', self._locator)
-                self.attrib['checked'] = ''
-            else:
-                self.browser.webdriver('uncheck', self._locator)
-                self.attrib.pop('checked', None)
-        # XXX:eo webdriver doesn't necessarily trigger this event for us,
-        # so do it manually
-        self.fire_event('change')
+            self.browser.webdriver('POST', 'element/%s/click' % self.wd_id())
 
     def set(self, key, value):
         if key != 'checked':
@@ -583,24 +568,30 @@ class TextareaElement(TextareaElement):
     @property
     def value(self):
         """The value= of this input."""
-        return self.browser.webdriver('GET', 'element/' + self.wd_id())
+        return self.browser.webdriver('GET', 'element/%s/value' % self.wd_id())
 
     @value.setter
     def value(self, value):
         self.attrib['value'] = value
         self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(),
-                               [c for c in value])
+                               value=[c for c in value])
 
     def enter(self, text, wait_for='duration', timeout=0.1):
         type_text(self, text, wait_for, timeout, allow_newlines=True)
 
 
-def _get_value_and_locator_from_option(option):
+def _get_value_and_locator_from_option(webdriver, option):
     if 'value' in option.attrib:
         if option.get('value') is None:
-            return None, u'value=regexp:^$'
+            opt_id = webdriver('POST', 'element', using='css selector',
+                               value='[value=""]')['value']
+            return None, ('id', str(opt_id))
         else:
-            return option.get('value'), u'value=%s' % option.get('value')
+            val = option.get('value')
+            opt_id = webdriver('POST', 'element', using='css selector',
+                               value='[value="' + val + '"]')['value']
+            return option.get('value'), ('id', opt_id)
+    raise NotImplemented
     option_text = (option.text or u'').strip()
     return option_text, u'label=%s' % option_text
 
@@ -616,15 +607,15 @@ class SelectElement(SelectElement):
         else:
             values = [value]
         for el in selected:
-            val, option_locator = _get_value_and_locator_from_option(el)
+            val, option_locator = _get_value_and_locator_from_option(
+                    self.browser.webdriver, el)
             if val not in values:
                 raise AssertionError("Option with value %r not present in "
                                      "remote document!" % val)
             if self.multiple:
-                self.browser.webdriver('addSelection', self._locator,
-                                        option_locator)
+                self.browser.webdriver('POST', 'element/%s/click' % option_locator)
             else:
-                self.browser.webdriver('select', self._locator, option_locator)
+                self.browser.webdriver('POST', 'element/%s/click' % option_locator)
                 break
 
     value = property(SelectElement._value__get, _value__set)
@@ -660,7 +651,7 @@ class DOMElement(DOMElement):
 
     @property
     def is_visible(self):
-        return self.browser.webdriver.is_visible(self._locator)
+        return self.browser.webdriver('GET', 'element/%s/displayed' % self.wd_id())['value']
 
 
 webdriver_elements = {
