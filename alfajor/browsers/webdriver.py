@@ -107,7 +107,7 @@ class WebDriver(DOMMixin):
 
     @property
     def backend(self):
-        return self.selenium
+        return self.webdriver
 
     def reset(self):
         self.webdriver('DELETE', 'cookie')

@@ -80,7 +80,7 @@ class SeleniumManager(object):
         return self.browser
 
     def destroy(self):
-        if self.browser and self.browser.selenium._session_id:
+        if self.browser and self.browser.backend._session_id:
             try:
                 self.browser.backend.test_complete()
             except (KeyboardInterrupt, SystemExit):
