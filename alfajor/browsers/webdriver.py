@@ -520,7 +520,7 @@ class InputElement(InputElement):
         else:
             self.attrib['value'] = value
             self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(),
-                                   value=value)
+                                   value=[c for c in value])
 
     @value.deleter
     def value(self):
@@ -530,7 +530,7 @@ class InputElement(InputElement):
             if 'value' in self.attrib:
                 del self.attrib['value']
             self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(),
-                                   value='')
+                                   value=[])
 
     @property
     def checked(self):
@@ -588,7 +588,8 @@ class TextareaElement(TextareaElement):
     @value.setter
     def value(self, value):
         self.attrib['value'] = value
-        self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(), value)
+        self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(),
+                               [c for c in value])
 
     def enter(self, text, wait_for='duration', timeout=0.1):
         type_text(self, text, wait_for, timeout, allow_newlines=True)
