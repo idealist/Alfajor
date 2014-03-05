@@ -54,10 +54,9 @@ class SeleniumManager(object):
             return default[0]
         raise LookupError(key)
 
-    @lazy_property
-    def browser_factory(self):
+    def browser_factory(self, selenium_server, base_url, **kw):
         from alfajor.browsers.selenium import Selenium
-        return Selenium
+        return Selenium(selenium_server, self.browser_type, base_url, **kw)
 
     def create(self):
         base_url = self.server_url
@@ -75,8 +74,7 @@ class SeleniumManager(object):
         if waitexpr:
             kw = {'wait_expression': eval_dotted_path(waitexpr)}
 
-        self.browser = self.browser_factory(selenium_server, self.browser_type,
-                                            base_url, **kw)
+        self.browser = self.browser_factory(selenium_server, base_url, **kw)
         return self.browser
 
     def destroy(self):
@@ -105,10 +103,10 @@ class SeleniumManager(object):
 
 class WebDriverManager(SeleniumManager):
 
-    @lazy_property
-    def browser_factory(self):
+    def browser_factory(self, selenium_server, base_url, **kw):
         from alfajor.browsers.webdriver import WebDriver
-        return WebDriver
+        caps = {'browserName': self.browser_type}
+        return WebDriver(selenium_server, caps, base_url, **kw)
 
 
 class WSGIManager(object):
