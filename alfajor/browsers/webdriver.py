@@ -465,7 +465,6 @@ def _fill_form_async(form, values, wait_for=None, timeout=None):
 
 
 def type_text(element, text, wait_for=None, timeout=0, allow_newlines=False):
-    # webdriver.type_keys() doesn't work with non-printables like backspace
     webdriver, locator = element.browser.webdriver, element._locator
     # Store the original value
     field_value = element.value
@@ -494,7 +493,7 @@ class InputElement(InputElement):
         if self.checkable:
             # doesn't seem possible to mutate get value- via webdriver
             return self.attrib.get('value', '')
-        return self.browser.webdriver('getValue', self._locator)
+        return self.browser.webdriver('GET', 'element/' + self.wd_id())['value']
 
     @value.setter
     def value(self, value):
@@ -520,7 +519,8 @@ class InputElement(InputElement):
                     self.checked = bool(value)
         else:
             self.attrib['value'] = value
-            self.browser.webdriver('type', self._locator, value)
+            self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(),
+                                   value=value)
 
     @value.deleter
     def value(self):
@@ -529,7 +529,8 @@ class InputElement(InputElement):
         else:
             if 'value' in self.attrib:
                 del self.attrib['value']
-            self.browser.webdriver('type', self._locator, u'')
+            self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(),
+                                   value='')
 
     @property
     def checked(self):
@@ -582,12 +583,12 @@ class TextareaElement(TextareaElement):
     @property
     def value(self):
         """The value= of this input."""
-        return self.browser.webdriver('getValue', self._locator)
+        return self.browser.webdriver('GET', 'element/' + self.wd_id())
 
     @value.setter
     def value(self, value):
         self.attrib['value'] = value
-        self.browser.webdriver('type', self._locator, value)
+        self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(), value)
 
     def enter(self, text, wait_for='duration', timeout=0.1):
         type_text(self, text, wait_for, timeout, allow_newlines=True)
@@ -633,11 +634,11 @@ class DOMElement(DOMElement):
 
     @property
     def _locator(self):
-        """The fastest WebDriver locator expression for this element."""
+        """The fastest locator expression for this element."""
         try:
-            return 'id=' + self.attrib['id']
+            return ('id', self.attrib['id'])
         except KeyError:
-            return 'xpath=' + self.fq_xpath
+            return ('xpath', self.fq_xpath)
 
     click = event_sender('click')
     double_click = event_sender('double_click')
@@ -645,6 +646,11 @@ class DOMElement(DOMElement):
     mouse_out = event_sender('mouse_out')
     context_menu = event_sender('context_menu')
     focus = event_sender('focus')
+
+    def wd_id(self):
+        using, selector = self._locator
+        return self.browser.webdriver('POST', 'element',
+            using=using, value=selector)['value']['ELEMENT']
 
     def fire_event(self, name):
         before_browser_activity.send(self.browser)
