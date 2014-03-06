@@ -128,9 +128,7 @@ class WebDriver(DOMMixin):
     def location(self):
         return self.webdriver('GET', 'url')['value']
 
-    def wait_for(self, condition, timeout=None):
-        # TODO
-        return
+    def wait_for(self, condition, timeout=None, frequency=None):
         try:
             if not condition:
                 return
@@ -146,18 +144,16 @@ class WebDriver(DOMMixin):
             if timeout is None:
                 timeout = self.webdriver._current_timeout
             if condition == 'page':
-                self.webdriver('waitForPageToLoad', timeout)
+                pass  # no-op!
             elif condition.startswith('js:'):
-                expr = condition[3:]
-                js = ('var window = webdriver.browserbot.getCurrentWindow(); ' +
-                      expr)
-                self.webdriver('waitForCondition', js, timeout)
+                js = condition[3:]
+                self.webdriver.wait_for_condition(js, timeout, frequency)
             elif condition.startswith('element:'):
                 expr = condition[8:]
-                self.webdriver.wait_for_element_present(expr, timeout)
+                self.webdriver.wait_for_element_present(expr, timeout, frequency)
             elif condition.startswith('!element:'):
                 expr = condition[9:]
-                self.webdriver.wait_for_element_not_present(expr, timeout)
+                self.webdriver.wait_for_element_not_present(expr, timeout, frequency)
         except RuntimeError, detail:
             raise AssertionError('WebDriver encountered an error:  %s' % detail)
 
@@ -235,7 +231,7 @@ class WebDriverRemote(object):
         #for idx, arg in enumerate(args):
         #    payload[str(idx + 1)] = arg
 
-        logger.debug('webdriver(%s, %r)', command, args)
+        logger.debug('webdriver(%s, %r, %r)', command, args, kw)
         response = self._req_session.request(
                 method, self._server_url + '/' + command, data=json.dumps(kw))
         if not response.status_code < 300:
@@ -296,22 +292,57 @@ class WebDriverRemote(object):
         if value is None:
             return
         if value != self._current_timeout:
-            self('POST', 'timeouts', type='page load', ms=value)
+            self('setTimeout', value)
         self._current_timeout = value
 
     def open(self, url, timeout=None):
         with self._scoped_timeout(timeout):
             # Workaround for XHR ERROR failure on non-200 responses
-            # http://code.google.com/p/webdriver/issues/detail?id=408
-            self('POST', 'url', url=url)
+            # http://code.google.com/p/selenium/issues/detail?id=408
+            self('open', url, 'true')
 
-    def wait_for_element_present(self, expression, timeout=None):
-        with self._scoped_timeout(timeout):
-            self('waitForElementPresent', expression)
+    _default_frequency = 250
 
-    def wait_for_element_not_present(self, expression, timeout=None):
-        with self._scoped_timeout(timeout):
-            self('waitForElementNotPresent', expression)
+    def _exec_with_timeout(self, operation, timeout=None, frequency=None):
+        if timeout is None:
+            timeout = self._current_timeout or self._default_timeout or 2000
+        if frequency is None:
+            frequency = self._default_frequency
+        frequency = frequency / 1000.0
+        end_time = time.time() + timeout / 1000.0
+
+        while(True):
+            result = operation()
+            if result:
+                return
+            time.sleep(frequency)
+            if time.time() > end_time:
+                break
+        raise Exception('timeout')
+
+    def wait_for_condition(self, expression, timeout=None, frequency=None):
+        operation = lambda: self('POST', 'execute', script=expression, args=[])['value']
+        self._exec_with_timeout(operation, timeout, frequency)
+
+    def wait_for_element_present(self, expression, timeout=None, frequency=None):
+        def _find_element(driver):
+            try:
+                driver('POST', 'element', using='xpath', value=expression)
+                return True
+            except NoSuchElement:
+                return False
+        operation = lambda: _find_element(self)
+        self._exec_with_timeout(operation, timeout, frequency)
+
+    def wait_for_element_not_present(self, expression, timeout=None, frequency=None):
+        def _find_element(driver):
+            try:
+                driver('POST', 'element', using='xpath', value=expression)
+                return False
+            except NoSuchElement:
+                return True
+        operation = lambda: _find_element(self)
+        self._exec_with_timeout(operation, timeout, frequency)
 
     @contextmanager
     def _scoped_timeout(self, timeout):
@@ -628,3 +659,116 @@ webdriver_elements = {
     'select': SelectElement,
     'textarea': TextareaElement,
     }
+
+
+jsonwire_errors = {
+    0: {'detail': 'The command executed successfully.', 'summary': 'Success'},
+    7: {'detail': 'An element could not be located on the page using the givensearch parameters.',
+        'summary': 'NoSuchElement'},
+    8: {'detail': 'A request to switch to a frame could not be satisfied because the frame could not be found.',
+        'summary': 'NoSuchFrame'},
+    9: {'detail': 'The requested resource could not be found, or a request was received using an HTTP method that is not supported by the mapped resource.',
+        'summary': 'UnknownCommand'},
+    10: {'detail': 'An element command failed because the referenced element is no longer attached to the DOM.',
+         'summary': 'StaleElementReference'},
+    11: {'detail': 'An element command could not be completed because the element is not visible on the page.',
+         'summary': 'ElementNotVisible'},
+    12: {'detail': 'An element command could not be completed because the element is in an invalid state (e.g. attempting to click a disabled element).',
+         'summary': 'InvalidElementState'},
+    13: {'detail': 'An unknown server-side error occurred while processing thecommand.',
+         'summary': 'UnknownError'},
+    15: {'detail': 'An attempt was made to select an element that cannot be selected.',
+         'summary': 'ElementIsNotSelectable'},
+    17: {'detail': 'An error occurred while executing user supplied JavaScript.',
+         'summary': 'JavaScriptError'},
+    19: {'detail': 'An error occurred while searching for an element by XPath.',
+         'summary': 'XPathLookupError'},
+    21: {'detail': 'An operation did not complete before its timeout expired.',
+         'summary': 'Timeout'},
+    23: {'detail': 'A request to switch to a different window could not be satisfied because the window could not be found.',
+         'summary': 'NoSuchWindow'},
+    24: {'detail': 'An illegal attempt was made to set a cookie under a different domain than the current page.',
+         'summary': 'InvalidCookieDomain'},
+    25: {'detail': "A request to set a cookie's value could not be satisfied.",
+         'summary': 'UnableToSetCookie'},
+    26: {'detail': 'A modal dialog was open, blocking this operation',
+         'summary': 'UnexpectedAlertOpen'},
+    27: {'detail': 'An attempt was made to operate on a modal dialog when one was not open.',
+         'summary': 'NoAlertOpenError'},
+    28: {'detail': 'A script did not complete before its timeout expired.',
+         'summary': 'ScriptTimeout'},
+    29: {'detail': 'The coordinates provided to an interactions operation are invalid.',
+         'summary': 'InvalidElementCoordinates'},
+    30: {'detail': 'IME was not available.', 'summary': 'IMENotAvailable'},
+    31: {'detail': 'An IME engine could not be started.',
+         'summary': 'IMEEngineActivationFailed'},
+    32: {'detail': 'Argument was an invalid selector (e.g. XPath/CSS).',
+         'summary': 'InvalidSelector'}
+}
+
+
+class WebDriverException(Exception):
+    pass
+
+class NoSuchElement(WebDriverException):
+    pass
+
+class NoSuchFrame(WebDriverException):
+    pass
+
+class UnknownCommand(WebDriverException):
+    pass
+
+class StaleElementReference(WebDriverException):
+    pass
+
+class ElementNotVisible(WebDriverException):
+    pass
+
+class InvalidElementState(WebDriverException):
+    pass
+
+class UnknownError(WebDriverException):
+    pass
+
+class ElementIsNotSelectable(WebDriverException):
+    pass
+
+class JavaScriptError(WebDriverException):
+    pass
+
+class XPathLookupError(WebDriverException):
+    pass
+
+class Timeout(WebDriverException):
+    pass
+
+class NoSuchWindow(WebDriverException):
+    pass
+
+class InvalidCookieDomain(WebDriverException):
+    pass
+
+class UnableToSetCookie(WebDriverException):
+    pass
+
+class UnexpectedAlertOpen(WebDriverException):
+    pass
+
+class NoAlertOpenError(WebDriverException):
+    pass
+
+class ScriptTimeout(WebDriverException):
+    pass
+
+class InvalidElementCoordinates(WebDriverException):
+    pass
+
+class IMENotAvailable(WebDriverException):
+    pass
+
+class IMEEngineActivationFailed(WebDriverException):
+    pass
+
+class InvalidSelector(WebDriverException):
+    pass
