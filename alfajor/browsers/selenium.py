@@ -425,8 +425,25 @@ class InputElement(InputElement):
     @value.setter
     def value(self, value):
         if self.checkable:
-            # doesn't seem possible to mutate these values via selenium
-            pass
+            group = self.form['input[name=%s]' % self.name]
+            if self.type == 'radio':
+                target = self.form.cssselect(
+                    'input[name=%s][value=%s]' % (self.name, value))
+                if target:
+                    target[0].checked = True
+            if self.type == 'checkbox':
+                if len(group) > 1:
+                    if isinstance(value, basestring):
+                        discriminator = lambda i, v: i.value == value
+                    else:
+                        discriminator = lambda i, v: i.value in value
+                    for input in group:
+                        if discriminator(input.value, value):
+                            input.checked = True
+                        else:
+                            input.checked = False
+                elif len(group) == 1:
+                    self.checked = bool(value)
         else:
             self.attrib['value'] = value
             self.browser.selenium('type', self._locator, value)
@@ -462,9 +479,6 @@ class InputElement(InputElement):
             return
         elif self.type == 'radio':
             self.browser.selenium('check', self._locator)
-            # XXX:eo selenium doesn't necessarily trigger this event for us,
-            # so do it manually
-            self.fire_event('change')
             self.attrib['checked'] = ''
             for el in self.form.inputs[self.name]:
                 if el.value != self.value:
@@ -476,6 +490,9 @@ class InputElement(InputElement):
             else:
                 self.browser.selenium('uncheck', self._locator)
                 self.attrib.pop('checked', None)
+        # XXX:eo selenium doesn't necessarily trigger this event for us,
+        # so do it manually
+        self.fire_event('change')
 
     def set(self, key, value):
         if key != 'checked':
