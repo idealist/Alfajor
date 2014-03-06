@@ -81,14 +81,6 @@ class WaitExpression(object):
         """True if no jQuery ajax requests are pending."""
         return self
 
-    def postajax_complete(self):
-        """True if 'all' ajax handlers have completed execution"""
-        """
-        TODO:eo make the above statement true, currently just a 500ms delay
-        from when the ajax request completes.
-        """
-        return self
-
     def __unicode__(self):
         """The rendered value of the expression."""
         return u''
