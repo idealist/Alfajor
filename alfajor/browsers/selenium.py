@@ -104,7 +104,8 @@ class Selenium(DOMMixin):
             'version': ua.version,
             }
 
-    def sync_document(self):
+    def sync_document(self, wait_for=None, timeout=None):
+        self.wait_for(wait_for, timeout)
         self.response = '<html>' + self.selenium('getHtmlSource') + '</html>'
         self.__dict__.pop('document', None)
 
