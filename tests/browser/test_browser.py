@@ -23,8 +23,8 @@ def test_simple():
 
     # This is generally not a safe assertion... the browser could (and does)
     # normalize the returned html in some fashion.
-    assert browser.response == ('<html><head></head>'
-                                '<body><p>hi there</p></body></html>')
+    assert browser.response.lower().replace('\r\n', '') == (
+            '<html><head></head><body><p>hi there</p></body></html>')
 
     assert browser.document.cssselect('p')[0].text == 'hi there'
 
