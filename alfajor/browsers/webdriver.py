@@ -396,11 +396,13 @@ def event_sender(name):
 
     def handler(self, wait_for=None, timeout=None):
         before_browser_activity.send(self.browser)
-        self.browser.webdriver(webdriver_name, self._locator)
+        element = self.wd_id()
+        if 'click' in name:
+            self.browser.webdriver('POST', 'moveto', element=element)
+        self.browser.webdriver('POST', 'element/%s/%s' % (element, webdriver_name))
         # XXX:dc: when would a None wait_for be a good thing?
         if wait_for:
             self.browser.wait_for(wait_for, timeout)
-        time.sleep(0.2)
         after_browser_activity.send(self.browser)
         self.browser.sync_document()
     handler.__name__ = name
