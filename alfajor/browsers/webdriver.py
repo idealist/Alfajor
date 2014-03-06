@@ -114,13 +114,11 @@ class WebDriver(DOMMixin):
 
     @property
     def user_agent(self):
-        if not self.webdriver._user_agent:
-            return dict.fromkeys(('browser', 'platform', 'version'), 'unknown')
-        ua = UserAgent(self.webdriver._user_agent)
+        result = self.webdriver('GET', '')['value']
         return {
-            'browser': ua.browser,
-            'platform': ua.platform,
-            'version': ua.version,
+            'browser': result['browserName'],
+            'platform': result['platform'],
+            'version': result['version'],
             }
 
     def sync_document(self, wait_for=None, timeout=None):
