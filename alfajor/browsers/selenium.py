@@ -42,6 +42,8 @@ __all__ = ['Selenium']
 logger = getLogger('tests.browser')
 after_browser_activity = signal('after_browser_activity')
 before_browser_activity = signal('before_browser_activity')
+after_page_load = signal('after_page_load')
+before_page_load = signal('before_page_load')
 _enterable_chars_re = re.compile(r'(\\[a-z]|\\\d+|.)')
 csv.register_dialect('cookies', delimiter=';',
                      skipinitialspace=True,
@@ -60,7 +62,7 @@ class Selenium(DOMMixin):
     wait_expression = SeleniumWaitExpression
 
     def __init__(self, server_url, browser_cmd, base_url=None,
-                 default_timeout=16000):
+                 default_timeout=16000, **kw):
         self.selenium = SeleniumRemote(
             server_url, browser_cmd, default_timeout)
         self._base_url = base_url
@@ -69,10 +71,12 @@ class Selenium(DOMMixin):
         self.status = ''
         self.response = None
         self.headers = {}
+        self.wait_expression = kw.pop('wait_expression', self.wait_expression)
 
     def open(self, url, wait_for='page', timeout=None):
         logger.info('open(%s)', url)
         before_browser_activity.send(self)
+        before_page_load.send(self, url=url)
         if self._base_url:
             url = urljoin(self._base_url, url)
         if not self.selenium._session_id:
@@ -84,6 +88,7 @@ class Selenium(DOMMixin):
             self.wait_for(wait_for, timeout)
         after_browser_activity.send(self, url=url)
         self.sync_document()
+        after_page_load.send(self, url=url)
 
     def reset(self):
         self.selenium('deleteAllVisibleCookies')
@@ -111,6 +116,8 @@ class Selenium(DOMMixin):
         try:
             if not condition:
                 return
+            if condition == 'ajax':
+                condition = self.wait_expression(['ajax_complete'])
             if isinstance(condition, WaitExpression):
                 condition = u'js:' + unicode(condition)
 
@@ -122,17 +129,6 @@ class Selenium(DOMMixin):
                 timeout = self.selenium._current_timeout
             if condition == 'page':
                 self.selenium('waitForPageToLoad', timeout)
-            elif condition == 'ajax':
-                # ajax has been made identical to postAjax
-                js = ('var window = selenium.browserbot.getCurrentWindow();'
-                      'window.Alfajor && window.Alfajor.postAjaxComplete == 0;')
-                self.selenium('waitForCondition', js, timeout)
-            elif condition == 'postajax':
-                # seems like the DOM gets messed up temporarily, so waiting
-                # for window.Alfajor ensures that everything is in place (?)
-                js = ('var window = selenium.browserbot.getCurrentWindow();'
-                      'window.Alfajor && window.Alfajor.postAjaxComplete == 0;')
-                self.selenium('waitForCondition', js, timeout)
             elif condition.startswith('js:'):
                 expr = condition[3:]
                 js = ('var window = selenium.browserbot.getCurrentWindow(); ' +
@@ -229,7 +225,9 @@ class SeleniumRemote(object):
 
             if rows:
                 return dict(
-                    map(lambda x: x.strip('"'), x.split('=', 1)) for x in rows[0])
+                    # Transform mycookie="abc=def" into ['mycookie', 'abc=def']
+                    map(lambda x: x.strip('"'), x.split('=', 1))
+                        for x in rows[0])
             else:
                 return {}
         else:

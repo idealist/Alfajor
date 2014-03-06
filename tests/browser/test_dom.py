@@ -16,7 +16,7 @@ def test_indexing():
     assert doc['body #A'].tag == 'dl'
     assert isinstance(doc['#A ul'], list)
     assert isinstance(doc['body #A ul'], list)
-    assert doc['#C'][0].text == '1'
+    assert doc['#C'][0].text[:1] == '1'
     assert len(doc['#C']['li']) == 2
 
 

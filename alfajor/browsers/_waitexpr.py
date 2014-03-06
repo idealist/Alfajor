@@ -97,7 +97,12 @@ class WaitExpression(object):
 class SeleniumWaitExpression(WaitExpression):
     """Compound wait_for expression compiler for Selenium browsers."""
 
-    def __init__(self, *expressions):
+    ajax_pending_expr = ('var pending = window.jQuery && '
+                         'window.jQuery.active != 0;')
+    ajax_complete_expr = ('var complete = window.jQuery && '
+                          'window.jQuery.active == 0;')
+
+    def __init__(self, *expressions, **kw):
         self._expressions = []
         WaitExpression.__init__(self, *expressions)
 
@@ -138,30 +143,20 @@ class SeleniumWaitExpression(WaitExpression):
     def ajax_pending(self):
         js = """\
 (function() {
-  var complete = window.Alfajor && window.Alfajor.postAjaxComplete != 0;
   %s
-  return complete;
-})()""" % predicate_log('ajax_pending', 'complete')
+  %s
+  return pending;
+})()""" % (self.ajax_pending_expr, predicate_log('ajax_pending', 'pending'))
         self._expressions.append(js)
         return self
 
     def ajax_complete(self):
         js = """\
 (function() {
-  var complete = window.Alfajor && window.Alfajor.postAjaxComplete == 0;
+  %s
   %s
   return complete;
-})()""" % predicate_log('ajax_complete', 'complete')
-        self._expressions.append(js)
-        return self
-
-    def postajax_complete(self):
-        js = """\
-(function() {
-  var complete = window.Alfajor && window.Alfajor.postAjaxComplete == 0;
-  %s
-  return complete;
-})()""" % predicate_log('ajax_complete', 'complete')
+})()""" % (self.ajax_complete_expr, predicate_log('ajax_complete', 'complete'))
         self._expressions.append(js)
         return self
 
@@ -193,6 +188,24 @@ class SeleniumWaitExpression(WaitExpression):
             last = expr
         predicate = u' '.join(components).replace('\n', ' ')
         return predicate
+
+
+class JQuerySeleniumWaitExpression(SeleniumWaitExpression):
+    pass
+
+
+class PrototypeSeleniumWaitExpression(SeleniumWaitExpression):
+    ajax_pending_expr = ('var pending = window.Ajax && '
+                         'window.Ajax.activeRequestCount != 0;')
+    ajax_complete_expr = ('var complete = window.Ajax && '
+                          'window.Ajax.activeRequestCount == 0;')
+
+
+class DojoSeleniumWaitExpression(SeleniumWaitExpression):
+    ajax_pending_expr = ('var pending = window.dojo && '
+                     'window.dojo.io.XMLHTTPTransport.inFlight.length != 0;')
+    ajax_complete_expr = ('var complete = window.dojo && '
+                      'window.dojo.io.XMLHTTPTransport.inFlight.length == 0;')
 
 
 def js_quote(string):

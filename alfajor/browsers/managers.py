@@ -67,7 +67,12 @@ class SeleniumManager(object):
             logger.debug("Service started.")
         selenium_server = self._config('selenium-server',
                                        'http://localhost:4444')
-        self.browser = Selenium(selenium_server, self.browser_type, base_url)
+        waitexpr = self._config('wait-expression', None)
+        kw = {}
+        if waitexpr:
+            kw = {'wait_expression': eval_dotted_path(waitexpr)}
+        self.browser = Selenium(selenium_server, self.browser_type, base_url,
+                                **kw)
         return self.browser
 
     def destroy(self):
