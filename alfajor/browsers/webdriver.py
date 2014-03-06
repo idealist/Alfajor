@@ -292,14 +292,14 @@ class WebDriverRemote(object):
         if value is None:
             return
         if value != self._current_timeout:
-            self('setTimeout', value)
+            self('POST', 'timeouts', type='page load', ms=value)
         self._current_timeout = value
 
     def open(self, url, timeout=None):
         with self._scoped_timeout(timeout):
             # Workaround for XHR ERROR failure on non-200 responses
             # http://code.google.com/p/selenium/issues/detail?id=408
-            self('open', url, 'true')
+            self('POST', 'url', url=url)
 
     _default_frequency = 250
 
