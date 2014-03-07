@@ -102,15 +102,15 @@ class SeleniumWaitExpression(WaitExpression):
         self._expressions.append(OR)
         return self
 
-    def predicate_log(self, label):
+    def predicate_log(self, label, var_name='value'):
         """Return JS for logging a boolean result test in the Selenium console."""
-        js = "LOG.info('wait_for %s ==' + value);" % js_quote(label)
+        js = "LOG.info('wait_for %s ==' + %s);" % (js_quote(label), var_name)
         return js
 
-    def evaluation_log(self, label, *args):
+    def evaluation_log(self, label, var_name='value', *args):
         """Return JS for logging an expression eval in the Selenium console."""
         inner = ', '.join(map(js_quote, args))
-        js = "LOG.info('wait_for %s(%s)=' + value);" % (js_quote(label), inner)
+        js = "LOG.info('wait_for %s(%s)=' + %s);" % (js_quote(label), inner, var_name)
         return js
 
     def element_present(self, finder):
@@ -127,7 +127,7 @@ class SeleniumWaitExpression(WaitExpression):
         locator = to_locator(finder)
         log = evaluation_log('evaluate_element', 'result', locator, expr)
         js = """\
-return (function () {
+(function () {
   var element;
   try {
     element = selenium.browserbot.findElement('%s');
@@ -145,21 +145,21 @@ return (function () {
 
     def ajax_pending(self):
         js = """\
-return (function() {
+(function() {
   %s
   %s
-  return value;
-})()""" % (self.ajax_pending_expr, self.predicate_log('ajax_pending'))
+  return pending;
+})()""" % (self.ajax_pending_expr, self.predicate_log('ajax_pending', 'pending'))
         self._expressions.append(js)
         return self
 
     def ajax_complete(self):
         js = """\
-return (function() {
+(function() {
   %s
   %s
-  return value;
-})()""" % (self.ajax_complete_expr, self.predicate_log('ajax_complete'))
+  return complete;
+})()""" % (self.ajax_complete_expr, self.predicate_log('ajax_complete', 'complete'))
         self._expressions.append(js)
         return self
 
@@ -167,7 +167,7 @@ return (function() {
         locator = to_locator(finder)
         log = evaluation_log(label, 'found', locator)
         return u"""\
-return (function () {
+(function () {
   var found = true;
   try {
     selenium.browserbot.findElement('%s');
@@ -237,6 +237,61 @@ return (function() {
 })()""" % (self.page_ready_expr, self.predicate_log('page_ready'))
         self._expressions.append(js)
         return self
+
+    def evaluate_element(self, finder, expr):
+        locator = to_locator(finder)
+        log = evaluation_log('evaluate_element', 'result', locator, expr)
+        js = """\
+return (function () {
+  var element;
+  try {
+    element = selenium.browserbot.findElement('%s');
+  } catch (e) {
+    element = null;
+  };
+  var result = false;
+  if (element != null)
+    result = %s;
+  %s
+  return result;
+})()""" % (js_quote(locator), expr, log)
+        self._expressions.append(js)
+        return self
+
+    def ajax_pending(self):
+        js = """\
+return (function() {
+  %s
+  %s
+  return value;
+})()""" % (self.ajax_pending_expr, self.predicate_log('ajax_pending'))
+        self._expressions.append(js)
+        return self
+
+    def ajax_complete(self):
+        js = """\
+return (function() {
+  %s
+  %s
+  return value;
+})()""" % (self.ajax_complete_expr, self.predicate_log('ajax_complete'))
+        self._expressions.append(js)
+        return self
+
+    def _is_element_present(self, label, finder, result):
+        locator = to_locator(finder)
+        log = evaluation_log(label, 'found', locator)
+        return u"""\
+return (function () {
+  var found = true;
+  try {
+    selenium.browserbot.findElement('%s');
+  } catch (e) {
+    found = false;
+  };
+  %s
+  return found == %s;
+})()""" % (js_quote(locator), log, result)
 
 
     def predicate_log(self, label):
