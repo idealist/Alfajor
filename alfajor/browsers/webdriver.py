@@ -24,7 +24,6 @@ from blinker import signal
 from werkzeug import UserAgent, url_encode
 
 from alfajor.browsers._lxml import (
-    _append_text_value,
     _group_key_value_pairs,
     DOMElement,
     DOMMixin,
@@ -61,7 +60,6 @@ after_browser_activity = signal('after_browser_activity')
 before_browser_activity = signal('before_browser_activity')
 after_page_load = signal('after_page_load')
 before_page_load = signal('before_page_load')
-_enterable_chars_re = re.compile(r'(\\[a-z]|\\\d+|.)')
 csv.register_dialect('cookies', delimiter=';',
                      skipinitialspace=True,
                      quoting=csv.QUOTE_NONE)
@@ -469,19 +467,10 @@ def _fill_form_async(form, values, wait_for=None, timeout=None):
         unset_count = len(values)
 
 
-def type_text(element, text, wait_for=None, timeout=0, allow_newlines=False):
+def type_text(element, text, allow_newlines=False):
     webdriver, locator = element.browser.webdriver, element._locator
     # Store the original value
-    field_value = element.value
-    for char in _enterable_chars_re.findall(text):
-        # SW: Is this char at a time still necessary?
-        field_value = _append_text_value(field_value, char, allow_newlines)
-        if len(char) == 1 and ord(char) < 32:
-            char = r'\%i' % ord(char)
-        webdriver('POST', 'element/%s/value' % element.wd_id(), value=[char])
-    if wait_for and timeout:
-        element.browser.wait_for(wait_for, timeout)
-        element.browser.sync_document()
+    webdriver('POST', 'element/%s/value' % element.wd_id(), value=[c for c in text])
 
 
 class InputElement(InputElement):
@@ -519,8 +508,8 @@ class InputElement(InputElement):
                     self.checked = bool(value)
         else:
             self.attrib['value'] = value
-            self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(),
-                                   value=[c for c in value])
+            self.browser.webdriver('POST', 'element/%s/clear' % self.wd_id())
+            type_text(self, value)
 
     @value.deleter
     def value(self):
@@ -563,7 +552,7 @@ class InputElement(InputElement):
         self.checked = True
 
     def enter(self, text, wait_for='duration', timeout=0.1):
-        type_text(self, text, wait_for, timeout)
+        type_text(self, text)
 
 
 class TextareaElement(TextareaElement):
@@ -580,7 +569,7 @@ class TextareaElement(TextareaElement):
                                value=[c for c in value])
 
     def enter(self, text, wait_for='duration', timeout=0.1):
-        type_text(self, text, wait_for, timeout, allow_newlines=True)
+        type_text(self, text)
 
 
 def _get_value_and_locator_from_option(webdriver, option):
