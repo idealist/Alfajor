@@ -102,6 +102,19 @@ class SeleniumWaitExpression(WaitExpression):
         self._expressions.append(OR)
         return self
 
+    def predicate_log(self, label, result_variable):
+        """Return JS for logging a boolean result test in the Selenium console."""
+        js = "LOG.info('wait_for %s ==' + %s);" % (
+            js_quote(label), result_variable)
+        return js
+
+    def evaluation_log(self, label, result_variable, *args):
+        """Return JS for logging an expression eval in the Selenium console."""
+        inner = ', '.join(map(js_quote, args))
+        js = "LOG.info('wait_for %s(%s)=' + %s);" % (
+            js_quote(label), inner, result_variable)
+        return js
+
     def element_present(self, finder):
         js = self._is_element_present('element_present', finder, 'true')
         self._expressions.append(js)
@@ -116,7 +129,7 @@ class SeleniumWaitExpression(WaitExpression):
         locator = to_locator(finder)
         log = evaluation_log('evaluate_element', 'result', locator, expr)
         js = """\
-(function () {
+return (function () {
   var element;
   try {
     element = selenium.browserbot.findElement('%s');
@@ -134,21 +147,21 @@ class SeleniumWaitExpression(WaitExpression):
 
     def ajax_pending(self):
         js = """\
-(function() {
+return (function() {
   %s
   %s
   return pending;
-})()""" % (self.ajax_pending_expr, predicate_log('ajax_pending', 'pending'))
+})()""" % (self.ajax_pending_expr, self.predicate_log('ajax_pending', 'pending'))
         self._expressions.append(js)
         return self
 
     def ajax_complete(self):
         js = """\
-(function() {
+return (function() {
   %s
   %s
   return complete;
-})()""" % (self.ajax_complete_expr, predicate_log('ajax_complete', 'complete'))
+})()""" % (self.ajax_complete_expr, self.predicate_log('ajax_complete', 'complete'))
         self._expressions.append(js)
         return self
 
@@ -156,7 +169,7 @@ class SeleniumWaitExpression(WaitExpression):
         locator = to_locator(finder)
         log = evaluation_log(label, 'found', locator)
         return u"""\
-(function () {
+return (function () {
   var found = true;
   try {
     selenium.browserbot.findElement('%s');
@@ -200,6 +213,19 @@ class DojoSeleniumWaitExpression(SeleniumWaitExpression):
                       'window.dojo.io.XMLHTTPTransport.inFlight.length == 0;')
 
 
+class WebDriverWaitExpression(SeleniumWaitExpression):
+
+    def predicate_log(self, label, result_variable):
+        return ';'
+
+    def evaluation_log(self, label, result_variable):
+        return ';'
+
+
+class JQueryWebDriverWaitExpression(WebDriverWaitExpression):
+    pass
+
+
 def js_quote(string):
     """Prepare a string for use in a 'single quoted' JS literal."""
     string = string.replace('\\', r'\\')
@@ -215,18 +241,3 @@ def to_locator(expr):
         return expr._locator
     else:
         raise RuntimeError("Unknown page element %r" % expr)
-
-
-def predicate_log(label, result_variable):
-    """Return JS for logging a boolean result test in the Selenium console."""
-    js = "LOG.info('wait_for %s ==' + %s);" % (
-        js_quote(label), result_variable)
-    return js
-
-
-def evaluation_log(label, result_variable, *args):
-    """Return JS for logging an expression eval in the Selenium console."""
-    inner = ', '.join(map(js_quote, args))
-    js = "LOG.info('wait_for %s(%s)=' + %s);" % (
-        js_quote(label), inner, result_variable)
-    return js

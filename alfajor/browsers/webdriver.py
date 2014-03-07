@@ -34,7 +34,7 @@ from alfajor.browsers._lxml import (
     _options_xpath,
     html_parser_for,
     )
-from alfajor.browsers._waitexpr import SeleniumWaitExpression, WaitExpression
+from alfajor.browsers._waitexpr import WebDriverWaitExpression, WaitExpression
 from alfajor.utilities import lazy_property
 from alfajor._compat import property
 
@@ -56,6 +56,10 @@ requests_log.propagate = True
 
 __all__ = ['WebDriver']
 logger = getLogger('tests.browser')
+logger.setLevel(logging.DEBUG)
+logger.propagate = True
+
+
 after_browser_activity = signal('after_browser_activity')
 before_browser_activity = signal('before_browser_activity')
 after_page_load = signal('after_page_load')
@@ -74,7 +78,7 @@ class WebDriver(DOMMixin):
         'webdriver',
         ]
 
-    wait_expression = SeleniumWaitExpression
+    wait_expression = WebDriverWaitExpression
 
     def __init__(self, server_url, browser_capabilites=None, base_url=None,
                  default_timeout=16000, **kw):
@@ -253,24 +257,6 @@ class WebDriverRemote(object):
             raise Exception('No webdriver session.')
         endpoint = 'session/' + self._session_id + '/' + unicode(command)
         return self._raw_call(method, endpoint, **kw)
-
-        data = response[3:]
-        if return_list:
-            rows = list(csv.reader(StringIO(data)))
-            return [transform(col) for col in rows[0]]
-
-        elif return_dict:
-            rows = list(csv.reader(StringIO(data), 'cookies'))
-
-            if rows:
-                return dict(
-                    # Transform mycookie="abc=def" into ['mycookie', 'abc=def']
-                    map(lambda x: x.strip('"'), x.split('=', 1))
-                        for x in rows[0])
-            else:
-                return {}
-        else:
-            return transform(data)
 
     def __getattr__(self, key):
         # proxy methods calls through to WebDriver, converting
