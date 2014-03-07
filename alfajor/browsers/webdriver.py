@@ -101,8 +101,7 @@ class WebDriver(DOMMixin):
         if not self.webdriver._session_id:
             self.webdriver.get_new_browser_session()
         self.webdriver.open(url, timeout)
-        if wait_for != 'page':
-            self.wait_for(wait_for, timeout)
+        self.wait_for(wait_for, timeout)
         after_browser_activity.send(self, url=url)
         self.sync_document()
         after_page_load.send(self, url=url)
@@ -138,6 +137,8 @@ class WebDriver(DOMMixin):
                 return
             if condition == 'ajax':
                 condition = self.wait_expression(['ajax_complete'])
+            if condition == 'page':
+                condition = self.wait_expression(['page_ready'])
             if isinstance(condition, WaitExpression):
                 condition = u'js:' + unicode(condition)
 
@@ -147,9 +148,7 @@ class WebDriver(DOMMixin):
                 return
             if timeout is None:
                 timeout = self.webdriver._current_timeout
-            if condition == 'page':
-                pass  # no-op!
-            elif condition.startswith('js:'):
+            if condition.startswith('js:'):
                 js = condition[3:]
                 self.webdriver.wait_for_condition(js, timeout, frequency)
             elif condition.startswith('element:'):
@@ -383,10 +382,10 @@ def toCamelCase(string):
     return re.sub(_underscrore_re, _camel_convert, string)
 
 
-def event_sender(name):
+def event_sender(name, default_wait_for=None):
     webdriver_name = toCamelCase(name)
 
-    def handler(self, wait_for=None, timeout=None):
+    def handler(self, wait_for=default_wait_for, timeout=None):
         before_browser_activity.send(self.browser)
         element = self.wd_id()
         if 'doubleclick' in name:
@@ -407,7 +406,7 @@ def event_sender(name):
 class FormElement(FormElement):
     """A <form/> that can be submitted."""
 
-    submit = event_sender('submit')
+    submit = event_sender('submit', 'page')
 
     def fill(self, values, wait_for=None, timeout=None, with_prefix=u''):
         grouped = _group_key_value_pairs(values, with_prefix)
@@ -617,7 +616,7 @@ class DOMElement(DOMElement):
         except KeyError:
             return ('xpath', self.fq_xpath)
 
-    click = event_sender('click')
+    click = event_sender('click', 'page')
     double_click = event_sender('double_click')
     mouse_over = event_sender('mouse_over')
     mouse_out = event_sender('mouse_out')

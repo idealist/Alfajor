@@ -102,17 +102,15 @@ class SeleniumWaitExpression(WaitExpression):
         self._expressions.append(OR)
         return self
 
-    def predicate_log(self, label, result_variable):
+    def predicate_log(self, label):
         """Return JS for logging a boolean result test in the Selenium console."""
-        js = "LOG.info('wait_for %s ==' + %s);" % (
-            js_quote(label), result_variable)
+        js = "LOG.info('wait_for %s ==' + value);" % js_quote(label)
         return js
 
-    def evaluation_log(self, label, result_variable, *args):
+    def evaluation_log(self, label, *args):
         """Return JS for logging an expression eval in the Selenium console."""
         inner = ', '.join(map(js_quote, args))
-        js = "LOG.info('wait_for %s(%s)=' + %s);" % (
-            js_quote(label), inner, result_variable)
+        js = "LOG.info('wait_for %s(%s)=' + value);" % (js_quote(label), inner)
         return js
 
     def element_present(self, finder):
@@ -150,8 +148,8 @@ return (function () {
 return (function() {
   %s
   %s
-  return pending;
-})()""" % (self.ajax_pending_expr, self.predicate_log('ajax_pending', 'pending'))
+  return value;
+})()""" % (self.ajax_pending_expr, self.predicate_log('ajax_pending'))
         self._expressions.append(js)
         return self
 
@@ -160,8 +158,8 @@ return (function() {
 return (function() {
   %s
   %s
-  return complete;
-})()""" % (self.ajax_complete_expr, self.predicate_log('ajax_complete', 'complete'))
+  return value;
+})()""" % (self.ajax_complete_expr, self.predicate_log('ajax_complete'))
         self._expressions.append(js)
         return self
 
@@ -200,25 +198,51 @@ class JQuerySeleniumWaitExpression(SeleniumWaitExpression):
 
 
 class PrototypeSeleniumWaitExpression(SeleniumWaitExpression):
-    ajax_pending_expr = ('var pending = window.Ajax && '
+    ajax_pending_expr = ('var value = window.Ajax && '
                          'window.Ajax.activeRequestCount != 0;')
-    ajax_complete_expr = ('var complete = window.Ajax && '
+    ajax_complete_expr = ('var value = window.Ajax && '
                           'window.Ajax.activeRequestCount == 0;')
 
 
 class DojoSeleniumWaitExpression(SeleniumWaitExpression):
-    ajax_pending_expr = ('var pending = window.dojo && '
+    ajax_pending_expr = ('var value = window.dojo && '
                      'window.dojo.io.XMLHTTPTransport.inFlight.length != 0;')
-    ajax_complete_expr = ('var complete = window.dojo && '
+    ajax_complete_expr = ('var value = window.dojo && '
                       'window.dojo.io.XMLHTTPTransport.inFlight.length == 0;')
 
 
 class WebDriverWaitExpression(SeleniumWaitExpression):
+    page_loading_expr = ('var value = window.jQuery && '
+                         'window.jQuery.ready.promise().state() != "resolved";')
+    page_ready_expr =   ('var value = window.jQuery === undefined || '
+                         'window.jQuery.ready.promise().state() == "resolved";')
 
-    def predicate_log(self, label, result_variable):
+
+    def ajax_loading(self):
+        js = """\
+return (function() {
+  %s
+  %s
+  return value;
+})()""" % (self.page_loading_expr, self.predicate_log('page_loading'))
+        self._expressions.append(js)
+        return self
+
+    def page_ready(self):
+        js = """\
+return (function() {
+  %s
+  %s
+  return value;
+})()""" % (self.page_ready_expr, self.predicate_log('page_ready'))
+        self._expressions.append(js)
+        return self
+
+
+    def predicate_log(self, label):
         return ';'
 
-    def evaluation_log(self, label, result_variable):
+    def evaluation_log(self, label):
         return ';'
 
 
