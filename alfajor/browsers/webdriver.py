@@ -478,7 +478,7 @@ def type_text(element, text, wait_for=None, timeout=0, allow_newlines=False):
         field_value = _append_text_value(field_value, char, allow_newlines)
         if len(char) == 1 and ord(char) < 32:
             char = r'\%i' % ord(char)
-        webdriver('POST', 'element/%s/value' % self.wd_id(), value=[char])
+        webdriver('POST', 'element/%s/value' % element.wd_id(), value=[char])
     if wait_for and timeout:
         element.browser.wait_for(wait_for, timeout)
         element.browser.sync_document()
@@ -588,12 +588,12 @@ def _get_value_and_locator_from_option(webdriver, option):
         if option.get('value') is None:
             opt_id = webdriver('POST', 'element', using='css selector',
                                value='[value=""]')['value']
-            return None, ('id', str(opt_id))
+            return None, opt_id['ELEMENT']
         else:
             val = option.get('value')
             opt_id = webdriver('POST', 'element', using='css selector',
                                value='[value="' + val + '"]')['value']
-            return option.get('value'), ('id', opt_id)
+            return option.get('value'), opt_id['ELEMENT']
     raise NotImplemented
     option_text = (option.text or u'').strip()
     return option_text, u'label=%s' % option_text
