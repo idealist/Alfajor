@@ -197,7 +197,8 @@ def test_set_cookie():
         browser.open('/')
 
         browser.set_cookie('foo', 'bar')
-        browser.set_cookie('py', 'py', 'localhost.local', port='8008')
+        domain = browser.location.split('/')[2]
+        browser.set_cookie('py', 'py', domain=domain, port='8008')
         browser.set_cookie('green', 'frog',
                            session=False, expires=time.time() + 3600)
         assert 'foo' in browser.cookies

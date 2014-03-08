@@ -162,10 +162,13 @@ class WebDriver(DOMMixin):
     @property
     def cookies(self):
         """A dictionary of cookie names and values."""
-        return {c['name']: c['value'] for c in self.webdriver('GET', 'cookie')['value']}
+        cookies = {c['name']: c['value'] for c in
+                   self.webdriver('GET', 'cookie')['value']}
+        return {k: v[1:-1] if v.startswith('"') and v.endswith('"')
+                else v for k, v in cookies.items()}
 
     def set_cookie(self, name, value, **kw):
-        max_age = kw.pop('max_age')
+        max_age = kw.pop('max_age', None)
         if max_age and 'expiry' not in kw:
             kw['expiry'] = max_age
         cookie = dict(name=name, value=value)
@@ -218,7 +221,7 @@ class WebDriverRemote(object):
     getNewBrowserSession = get_new_browser_session
 
     def test_complete(self):
-        self('testComplete')
+        self('DELETE')
         self._session_id = None
 
     testComplete = test_complete
@@ -247,7 +250,7 @@ class WebDriverRemote(object):
 
         return data
 
-    def __call__(self, method, command, **kw):
+    def __call__(self, method, command='', **kw):
         if not self._session_id:
             raise Exception('No webdriver session.')
         endpoint = 'session/' + self._session_id + '/' + unicode(command)
