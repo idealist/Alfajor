@@ -242,7 +242,12 @@ class WebDriverRemote(object):
         response = self._req_session.request(
                 method, self._server_url + '/' + command, data=json.dumps(kw))
         if not response.status_code < 300:
-            raise RuntimeError('Invalid Request: ' + response.text)
+            try:
+                data = json.loads(response.text)
+                msg = data['value']['message']
+            except:
+                msg = response.text
+            raise RuntimeError('Invalid Request: ' + msg)
         data = None
         if response.status_code == 200:
             data = response.json()
