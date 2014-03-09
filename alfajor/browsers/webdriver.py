@@ -90,6 +90,7 @@ class WebDriver(DOMMixin):
         self.status = ''
         self.response = None
         self.headers = {}
+        self.selenium = SeleniumCompatibilityShim(self)
         self.wait_expression = kw.pop('wait_expression', self.wait_expression)
 
     def open(self, url, wait_for='page', timeout=None):
@@ -188,6 +189,19 @@ class WebDriver(DOMMixin):
     @lazy_property
     def _lxml_parser(self):
         return html_parser_for(self, webdriver_elements)
+
+
+class SeleniumCompatibilityShim(object):
+
+    def __init__(self, browser):
+        self.browser = browser
+
+    def __call__(self, *args, **kw):
+        if args[0] == 'runScript':
+            kw['script'] = 'return %s' % args[1]
+            kw['args'] = []
+            return self.browser.webdriver('POST', 'execute', **kw)
+        raise NotImplementedError("No compatibility shim for %s" % args[0])
 
 
 class WebDriverRemote(object):
