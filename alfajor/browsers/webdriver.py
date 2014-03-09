@@ -173,7 +173,7 @@ class WebDriver(DOMMixin):
         max_age = kw.pop('max_age', None)
         if max_age and 'expiry' not in kw:
             kw['expiry'] = max_age
-        cookie = dict(name=name, value=value)
+        cookie = dict(name=name, value=unicode(value))
         for key in ('path', 'domain', 'secure', 'expiry'):
             if key in kw:
                 cookie[key] = kw[key]
