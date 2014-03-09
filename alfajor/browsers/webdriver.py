@@ -564,19 +564,15 @@ class TextareaElement(TextareaElement):
 
 
 def _get_value_and_locator_from_option(webdriver, option):
+    id = option.wd_id()
     if 'value' in option.attrib:
         if option.get('value') is None:
-            opt_id = webdriver('POST', 'element', using='css selector',
-                               value='[value=""]')['value']
-            return None, opt_id['ELEMENT']
+            value = None
         else:
-            val = option.get('value')
-            opt_id = webdriver('POST', 'element', using='css selector',
-                               value='[value="' + val + '"]')['value']
-            return option.get('value'), opt_id['ELEMENT']
-    raise NotImplemented
-    option_text = (option.text or u'').strip()
-    return option_text, u'label=%s' % option_text
+            value = option.get('value')
+    else:
+        value = webdriver('GET', 'element/%s/text' % id)['value']
+    return value, id
 
 
 class SelectElement(SelectElement):
@@ -587,6 +583,9 @@ class SelectElement(SelectElement):
                     if 'selected' in el.attrib]
         if self.multiple:
             values = value
+            # TODO: decide when to send ctrl vs command key?
+            # send command for multiple-select
+            self.browser.webdriver('POST', 'keys', value=[u'\ue03d'])
         else:
             values = [value]
         for el in selected:
@@ -600,6 +599,9 @@ class SelectElement(SelectElement):
             else:
                 self.browser.webdriver('POST', 'element/%s/click' % option_locator)
                 break
+        if self.multiple:
+            # clear modifier
+            self.browser.webdriver('POST', 'keys', value=[u'\ue000'])
 
     value = property(SelectElement._value__get, _value__set)
 
