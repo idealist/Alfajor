@@ -228,8 +228,6 @@ class WebDriverRemote(object):
 
         result = self._raw_call('POST', 'session', desiredCapabilities=caps)
         self._session_id = result['sessionId']
-        #self('getNewBrowserSession', self._browser_cmd,
-        #                        browser_url, extension_js, opts)
         self.set_timeout(self._default_timeout)
         #self._user_agent = self.get_eval('navigator.userAgent')
 
@@ -255,18 +253,18 @@ class WebDriverRemote(object):
         response = self._req_session.request(
                 method, self._server_url + '/' + command, data=json.dumps(kw))
         if not response.status_code < 300:
+            exc = RuntimeError
             try:
-                data = json.loads(response.text)
-                msg = data['value']['message']
+                data = response.json()
+                error = jsonwire_errors[data['status']]
+                exc = globals()[error['summary']]
+                msg = data['value'].get('state') or error['detail']
             except:
-                msg = response.text
-            raise RuntimeError('Invalid Request: ' + msg)
+                msg = 'Invalid Request: %s' % response.text
+            raise exc(msg)
         data = None
         if response.status_code == 200:
             data = response.json()
-
-        if data and data['status'] != 0:
-            raise RuntimeError(data['message'].encode('utf-8'))
 
         return data
 
