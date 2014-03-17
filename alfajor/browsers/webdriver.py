@@ -158,6 +158,13 @@ class WebDriver(DOMMixin):
             elif condition.startswith('!element:'):
                 expr = condition[9:]
                 self.webdriver.wait_for_element_not_present(expr, timeout, frequency)
+            elif condition.startswith('visible:'):
+                expr = condition[8:]
+                self.webdriver.wait_for_element_visible(expr, timeout, frequency)
+            elif condition.startswith('!visible:'):
+                expr = condition[9:]
+                self.webdriver.wait_for_element_invisible(expr, timeout, frequency)
+
         except RuntimeError, detail:
             raise AssertionError('WebDriver encountered an error:  %s' % detail)
 
@@ -347,6 +354,29 @@ class WebDriverRemote(object):
             except NoSuchElement:
                 return True
         operation = lambda: _find_element(self)
+        self._exec_with_timeout(operation, timeout, frequency)
+
+    def wait_for_element_visible(self, expression, timeout=None, frequency=None):
+        def _element_visible(driver):
+            try:
+                el = driver('POST', 'element', using='xpath', value=expression)['value']['ELEMENT']
+                displayed = driver('GET', 'element/%s/displayed' % el)['value']
+                return displayed
+            except NoSuchElement:
+                return False
+        operation = lambda: _element_visible(self)
+        self._exec_with_timeout(operation, timeout, frequency)
+
+    def wait_for_element_invisible(self, expression, timeout=None, frequency=None):
+        def _element_visible(driver):
+            try:
+                el = driver('POST', 'element', using='xpath', value=expression)['value']['ELEMENT']
+                displayed = driver('GET', 'element/%s/displayed' % el)['value']
+                return not displayed
+            except NoSuchElement:
+                # if an element doesn't exist, it's invisible, right? or raise?
+                return True
+        operation = lambda: _element_visible(self)
         self._exec_with_timeout(operation, timeout, frequency)
 
     @contextmanager
