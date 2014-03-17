@@ -136,10 +136,10 @@ class WebDriver(DOMMixin):
         try:
             if not condition:
                 return
+            if condition == 'page':
+                condition = u'js:return window.__page__ === undefined'
             if condition == 'ajax':
                 condition = self.wait_expression(['ajax_complete'])
-            if condition == 'page':
-                condition = self.wait_expression(['page_ready'])
             if isinstance(condition, WaitExpression):
                 condition = u'js:' + unicode(condition)
 
@@ -399,6 +399,8 @@ def event_sender(name, default_wait_for=None):
 
     def handler(self, wait_for=default_wait_for, timeout=None):
         before_browser_activity.send(self.browser)
+        if wait_for == 'page':
+            self.browser.webdriver('POST', 'execute', script='window.__page__ = true', args=[])
         element = self.wd_id()
         if 'doubleclick' in name:
             self.browser.webdriver('POST', 'moveto', element=element)
