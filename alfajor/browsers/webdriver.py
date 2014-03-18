@@ -516,10 +516,8 @@ class InputElement(InputElement):
     @property
     def value(self):
         """The value= of this input."""
-        if self.checkable:
-            # doesn't seem possible to mutate get value- via webdriver
-            return self.attrib.get('value', '')
-        return self.browser.webdriver('GET', 'element/' + self.wd_id())['value']
+        return self.browser.webdriver('GET', 'element/%s/value' % self.wd_id()
+            )['value']
 
     @value.setter
     def value(self, value):
@@ -597,11 +595,13 @@ class TextareaElement(TextareaElement):
     @property
     def value(self):
         """The value= of this input."""
-        return self.browser.webdriver('GET', 'element/%s/value' % self.wd_id())
+        return self.browser.webdriver('GET', 'element/%s/value' % self.wd_id()
+            )['value']
 
     @value.setter
     def value(self, value):
         self.attrib['value'] = value
+        self.browser.webdriver('POST', 'element/%s/clear' % self.wd_id())
         self.browser.webdriver('POST', 'element/%s/value' % self.wd_id(),
                                value=[c for c in value])
 

@@ -212,6 +212,10 @@ class DojoSeleniumWaitExpression(SeleniumWaitExpression):
 
 
 class WebDriverWaitExpression(SeleniumWaitExpression):
+    ajax_pending_expr = ('var value = window.jQuery && '
+                         'window.jQuery.active != 0;')
+    ajax_complete_expr = ('var value = window.jQuery && '
+                          'window.jQuery.active == 0;')
     page_loading_expr = ('var value = window.jQuery && '
                          'window.jQuery.ready.promise().state() != "resolved";')
     page_ready_expr =   ('var value = window.jQuery === undefined || '
