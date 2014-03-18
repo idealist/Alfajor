@@ -203,6 +203,23 @@ class SeleniumCompatibilityShim(object):
     def __init__(self, browser):
         self.browser = browser
 
+    def __getattr__(self, key):
+        # proxy methods calls through to Selenium, converting
+        # python_form to camelCase
+        if '_' in key:
+            key = toCamelCase(key)
+        kw = {}
+        if key.startswith('is') or key.startswith('getWhether'):
+            kw['transform'] = 'bool'
+        elif (key.startswith('get') and
+              any(x in key for x in ('Speed', 'Position',
+                                     'Height', 'Width',
+                                     'Index', 'Count'))):
+            kw['transform'] = 'int'
+        if key.startswith('get') and key[-1] == 's':
+            kw['list'] = True
+        return partial(self, key, **kw)
+
     def __call__(self, *args, **kw):
         if args[0] == 'runScript':
             kw['script'] = 'return %s' % args[1]
