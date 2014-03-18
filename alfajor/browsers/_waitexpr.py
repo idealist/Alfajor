@@ -125,7 +125,7 @@ class SeleniumWaitExpression(WaitExpression):
 
     def evaluate_element(self, finder, expr):
         locator = to_locator(finder)
-        log = evaluation_log('evaluate_element', 'result', locator, expr)
+        log = self.evaluation_log('evaluate_element', 'result', locator, expr)
         js = """\
 (function () {
   var element;
@@ -165,7 +165,7 @@ class SeleniumWaitExpression(WaitExpression):
 
     def _is_element_present(self, label, finder, result):
         locator = to_locator(finder)
-        log = evaluation_log(label, 'found', locator)
+        log = self.evaluation_log(label, 'found', locator)
         return u"""\
 (function () {
   var found = true;
@@ -244,7 +244,7 @@ return (function() {
 
     def evaluate_element(self, finder, expr):
         locator = to_locator(finder)
-        log = evaluation_log('evaluate_element', 'result', locator, expr)
+        log = self.evaluation_log('evaluate_element', 'result', locator, expr)
         js = """\
 return (function () {
   var element;
@@ -284,7 +284,7 @@ return (function() {
 
     def _is_element_present(self, label, finder, result):
         locator = to_locator(finder)
-        log = evaluation_log(label, 'found', locator)
+        log = self.evaluation_log(label, 'found', locator)
         return u"""\
 return (function () {
   var found = true;
