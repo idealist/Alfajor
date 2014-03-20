@@ -143,6 +143,9 @@ class WebDriver(DOMMixin):
             if isinstance(condition, WaitExpression):
                 condition = u'js:' + unicode(condition)
 
+            if condition.startswith('duration:'):
+                timeout = int(condition.split(':', 1)[1])
+                condition = 'duration'
             if condition == 'duration':
                 if timeout:
                     time.sleep(timeout / 1000.0)

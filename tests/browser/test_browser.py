@@ -213,3 +213,6 @@ def test_screenshot():
         return
     browser.open('http://www.google.com')
     assert False
+
+
+## TODO: test browser.selenium.run_script()
