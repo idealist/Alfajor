@@ -362,7 +362,7 @@ class WebDriverRemote(object):
                 el = driver('POST', 'element', using='xpath', value=expression)['value']['ELEMENT']
                 displayed = driver('GET', 'element/%s/displayed' % el)['value']
                 return displayed
-            except NoSuchElement:
+            except ElementNotVisible:
                 return False
         operation = lambda: _element_visible(self)
         self._exec_with_timeout(operation, timeout, frequency)
@@ -373,7 +373,7 @@ class WebDriverRemote(object):
                 el = driver('POST', 'element', using='xpath', value=expression)['value']['ELEMENT']
                 displayed = driver('GET', 'element/%s/displayed' % el)['value']
                 return not displayed
-            except NoSuchElement:
+            except ElementNotVisible:
                 # if an element doesn't exist, it's invisible, right? or raise?
                 return True
         operation = lambda: _element_visible(self)
