@@ -435,6 +435,9 @@ def event_sender(name, default_wait_for=None):
         if 'doubleclick' in name:
             self.browser.webdriver('POST', 'moveto', element=element)
             self.browser.webdriver('POST', '%s' % (element, webdriver_name))
+        elif name == 'mouse_over':
+            # compatibility w/ selenium rc
+            self.browser.webdriver('POST', 'moveto', element=element)
         else:
             self.browser.webdriver('POST', 'element/%s/%s' % (element, webdriver_name))
         # XXX:dc: when would a None wait_for be a good thing?
