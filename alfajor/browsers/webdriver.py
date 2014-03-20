@@ -708,7 +708,7 @@ jsonwire_errors = {
          'summary': 'ElementNotVisible'},
     12: {'detail': 'An element command could not be completed because the element is in an invalid state (e.g. attempting to click a disabled element).',
          'summary': 'InvalidElementState'},
-    13: {'detail': 'An unknown server-side error occurred while processing thecommand.',
+    13: {'detail': 'An unknown server-side error occurred while processing the command.',
          'summary': 'UnknownError'},
     15: {'detail': 'An attempt was made to select an element that cannot be selected.',
          'summary': 'ElementIsNotSelectable'},
