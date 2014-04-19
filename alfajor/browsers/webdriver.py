@@ -10,18 +10,15 @@ from __future__ import with_statement
 from contextlib import contextmanager
 import copy
 import csv
-from cStringIO import StringIO
 from functools import partial
 import json
-from logging import getLogger
+import logging
 import re
 import requests
 import time
 from urlparse import urljoin
-from warnings import warn
 
 from blinker import signal
-from werkzeug import UserAgent, url_encode
 
 from alfajor.browsers._lxml import (
     _group_key_value_pairs,
@@ -38,16 +35,18 @@ from alfajor.browsers._waitexpr import WebDriverWaitExpression, WaitExpression
 from alfajor.utilities import lazy_property
 from alfajor._compat import property
 
-import requests
-import logging
 
-# these two lines enable debugging at httplib level (requests->urllib3->httplib)
-# you will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
+# these two lines enable debugging at httplib level
+# (requests->urllib3->httplib)
+# you will see the REQUEST, including HEADERS and DATA, and RESPONSE with
+# HEADERS but without DATA.
 # the only thing missing will be the response.body which is not logged.
-import httplib
+# import httplib
 # httplib.HTTPConnection.debuglevel = 1
 
-logging.basicConfig() # you need to initialize logging, otherwise you will not see anything from requests
+
+logging.basicConfig()  # you need to initialize logging, otherwise you
+                       # will not see anything from requests
 logging.getLogger().setLevel(logging.DEBUG)
 requests_log = logging.getLogger("requests.packages.urllib3")
 requests_log.setLevel(logging.DEBUG)
@@ -55,7 +54,7 @@ requests_log.propagate = True
 
 
 __all__ = ['WebDriver']
-logger = getLogger('tests.browser')
+logger = logging.getLogger('tests.browser')
 logger.setLevel(logging.DEBUG)
 logger.propagate = True
 
@@ -157,19 +156,24 @@ class WebDriver(DOMMixin):
                 self.webdriver.wait_for_condition(js, timeout, frequency)
             elif condition.startswith('element:'):
                 expr = condition[8:]
-                self.webdriver.wait_for_element_present(expr, timeout, frequency)
+                self.webdriver.wait_for_element_present(expr, timeout,
+                                                        frequency)
             elif condition.startswith('!element:'):
                 expr = condition[9:]
-                self.webdriver.wait_for_element_not_present(expr, timeout, frequency)
+                self.webdriver.wait_for_element_not_present(expr, timeout,
+                                                            frequency)
             elif condition.startswith('visible:'):
                 expr = condition[8:]
-                self.webdriver.wait_for_element_visible(expr, timeout, frequency)
+                self.webdriver.wait_for_element_visible(expr, timeout,
+                                                        frequency)
             elif condition.startswith('!visible:'):
                 expr = condition[9:]
-                self.webdriver.wait_for_element_invisible(expr, timeout, frequency)
+                self.webdriver.wait_for_element_invisible(expr, timeout,
+                                                          frequency)
 
         except RuntimeError, detail:
-            raise AssertionError('WebDriver encountered an error:  %s' % detail)
+            raise AssertionError(
+                'WebDriver encountered an error:  %s' % detail)
 
     @property
     def cookies(self):
@@ -233,7 +237,8 @@ class SeleniumCompatibilityShim(object):
 
 class WebDriverRemote(object):
 
-    def __init__(self, server_url, browser_capabilities=None, default_timeout=None):
+    def __init__(self, server_url, browser_capabilities=None,
+                 default_timeout=None):
         self._server_url = server_url.rstrip('/') + '/wd/hub'
         self._user_agent = None
         self._session_id = None
@@ -277,8 +282,9 @@ class WebDriverRemote(object):
         #    payload[str(idx + 1)] = arg
 
         logger.debug('webdriver(%s, %r, %r)', command, args, kw)
-        response = self._req_session.request(
-                method, self._server_url + '/' + command, data=json.dumps(kw))
+        response = self._req_session.request(method,
+                                             self._server_url + '/' + command,
+                                             data=json.dumps(kw))
         if not response.status_code < 300:
             exc = RuntimeError
             try:
@@ -353,10 +359,12 @@ class WebDriverRemote(object):
         raise Exception('timeout')
 
     def wait_for_condition(self, expression, timeout=None, frequency=None):
-        operation = lambda: self('POST', 'execute', script=expression, args=[])['value']
+        operation = lambda: self('POST', 'execute', script=expression,
+                                 args=[])['value']
         self._exec_with_timeout(operation, timeout, frequency)
 
-    def wait_for_element_present(self, expression, timeout=None, frequency=None):
+    def wait_for_element_present(self, expression, timeout=None,
+                                 frequency=None):
         def _find_element(driver):
             try:
                 driver('POST', 'element', using='xpath', value=expression)
@@ -366,7 +374,8 @@ class WebDriverRemote(object):
         operation = lambda: _find_element(self)
         self._exec_with_timeout(operation, timeout, frequency)
 
-    def wait_for_element_not_present(self, expression, timeout=None, frequency=None):
+    def wait_for_element_not_present(self, expression, timeout=None,
+                                     frequency=None):
         def _find_element(driver):
             try:
                 driver('POST', 'element', using='xpath', value=expression)
@@ -376,10 +385,12 @@ class WebDriverRemote(object):
         operation = lambda: _find_element(self)
         self._exec_with_timeout(operation, timeout, frequency)
 
-    def wait_for_element_visible(self, expression, timeout=None, frequency=None):
+    def wait_for_element_visible(self, expression, timeout=None,
+                                 frequency=None):
         def _element_visible(driver):
             try:
-                el = driver('POST', 'element', using='xpath', value=expression)['value']['ELEMENT']
+                el = driver('POST', 'element', using='xpath',
+                            value=expression)['value']['ELEMENT']
                 displayed = driver('GET', 'element/%s/displayed' % el)['value']
                 return displayed
             except ElementNotVisible:
@@ -387,10 +398,12 @@ class WebDriverRemote(object):
         operation = lambda: _element_visible(self)
         self._exec_with_timeout(operation, timeout, frequency)
 
-    def wait_for_element_invisible(self, expression, timeout=None, frequency=None):
+    def wait_for_element_invisible(self, expression, timeout=None,
+                                   frequency=None):
         def _element_visible(driver):
             try:
-                el = driver('POST', 'element', using='xpath', value=expression)['value']['ELEMENT']
+                el = driver('POST', 'element', using='xpath',
+                            value=expression)['value']['ELEMENT']
                 displayed = driver('GET', 'element/%s/displayed' % el)['value']
                 return not displayed
             except ElementNotVisible:
@@ -450,7 +463,8 @@ def event_sender(name, default_wait_for=None):
     def handler(self, wait_for=default_wait_for, timeout=None):
         before_browser_activity.send(self.browser)
         if wait_for == 'page':
-            self.browser.webdriver('POST', 'execute', script='window.__page__ = true', args=[])
+            self.browser.webdriver('POST', 'execute',
+                                   script='window.__page__ = true', args=[])
         element = self.wd_id()
         if 'doubleclick' in name:
             self.browser.webdriver('POST', 'moveto', element=element)
@@ -525,9 +539,10 @@ def _fill_form_async(form, values, wait_for=None, timeout=None):
 
 
 def type_text(element, text, allow_newlines=False):
-    webdriver, locator = element.browser.webdriver, element._locator
+    webdriver = element.browser.webdriver
     # Store the original value
-    webdriver('POST', 'element/%s/value' % element.wd_id(), value=[c for c in text])
+    webdriver('POST', 'element/%s/value' % element.wd_id(),
+              value=[c for c in text])
 
 
 class InputElement(InputElement):
@@ -536,8 +551,9 @@ class InputElement(InputElement):
     @property
     def value(self):
         """The value= of this input."""
-        return self.browser.webdriver('GET', 'element/%s/value' % self.wd_id()
-            )['value']
+        return self.browser.webdriver('GET',
+                                      'element/%s/value' % self.wd_id()
+                                      )['value']
 
     @value.setter
     def value(self, value):
@@ -581,7 +597,8 @@ class InputElement(InputElement):
         if not self.checkable:
             raise AttributeError('Not a checkable input type')
         return self.browser.webdriver('GET',
-                'element/%s/selected' % self.wd_id())['value']
+                                      'element/%s/selected' % self.wd_id()
+                                      )['value']
 
     @checked.setter
     def checked(self, value):
@@ -615,8 +632,9 @@ class TextareaElement(TextareaElement):
     @property
     def value(self):
         """The value= of this input."""
-        return self.browser.webdriver('GET', 'element/%s/value' % self.wd_id()
-            )['value']
+        return self.browser.webdriver('GET',
+                                      'element/%s/value' % self.wd_id()
+                                      )['value']
 
     @value.setter
     def value(self, value):
@@ -656,14 +674,16 @@ class SelectElement(SelectElement):
             values = [value]
         for el in selected:
             val, option_locator = _get_value_and_locator_from_option(
-                    self.browser.webdriver, el)
+                self.browser.webdriver, el)
             if val not in values:
                 raise AssertionError("Option with value %r not present in "
                                      "remote document!" % val)
             if self.multiple:
-                self.browser.webdriver('POST', 'element/%s/click' % option_locator)
+                self.browser.webdriver('POST',
+                                       'element/%s/click' % option_locator)
             else:
-                self.browser.webdriver('POST', 'element/%s/click' % option_locator)
+                self.browser.webdriver('POST',
+                                       'element/%s/click' % option_locator)
                 break
         if self.multiple:
             # clear modifier
@@ -692,8 +712,8 @@ class DOMElement(DOMElement):
 
     def wd_id(self):
         using, selector = self._locator
-        return self.browser.webdriver('POST', 'element',
-            using=using, value=selector)['value']['ELEMENT']
+        return self.browser.webdriver('POST', 'element', using=using,
+                                      value=selector)['value']['ELEMENT']
 
     def fire_event(self, name):
         before_browser_activity.send(self.browser)
@@ -702,7 +722,9 @@ class DOMElement(DOMElement):
 
     @property
     def is_visible(self):
-        return self.browser.webdriver('GET', 'element/%s/displayed' % self.wd_id())['value']
+        return self.browser.webdriver('GET',
+                                      'element/%s/displayed' % self.wd_id()
+                                      )['value']
 
 
 webdriver_elements = {
@@ -716,41 +738,57 @@ webdriver_elements = {
 
 jsonwire_errors = {
     0: {'detail': 'The command executed successfully.', 'summary': 'Success'},
-    7: {'detail': 'An element could not be located on the page using the givensearch parameters.',
+    7: {'detail': ('An element could not be located on the page using the '
+                   'givensearch parameters.'),
         'summary': 'NoSuchElement'},
-    8: {'detail': 'A request to switch to a frame could not be satisfied because the frame could not be found.',
+    8: {'detail': ('A request to switch to a frame could not be satisfied'
+                   ' because the frame could not be found.'),
         'summary': 'NoSuchFrame'},
-    9: {'detail': 'The requested resource could not be found, or a request was received using an HTTP method that is not supported by the mapped resource.',
+    9: {'detail': ('The requested resource could not be found, or a request '
+                   'was received using an HTTP method that is not supported'
+                   ' by the mapped resource.'),
         'summary': 'UnknownCommand'},
-    10: {'detail': 'An element command failed because the referenced element is no longer attached to the DOM.',
+    10: {'detail': ('An element command failed because the referenced element '
+                    ' is no longer attached to the DOM.'),
          'summary': 'StaleElementReference'},
-    11: {'detail': 'An element command could not be completed because the element is not visible on the page.',
+    11: {'detail': ('An element command could not be completed because the'
+                    ' element is not visible on the page.'),
          'summary': 'ElementNotVisible'},
-    12: {'detail': 'An element command could not be completed because the element is in an invalid state (e.g. attempting to click a disabled element).',
+    12: {'detail': ('An element command could not be completed because the '
+                    ' element is in an invalid state (e.g. attempting to '
+                    'click a disabled element).'),
          'summary': 'InvalidElementState'},
-    13: {'detail': 'An unknown server-side error occurred while processing the command.',
+    13: {'detail': ('An unknown server-side error occurred while processing'
+                    ' the command.'),
          'summary': 'UnknownError'},
-    15: {'detail': 'An attempt was made to select an element that cannot be selected.',
+    15: {'detail': ('An attempt was made to select an element that cannot '
+                    'be selected.'),
          'summary': 'ElementIsNotSelectable'},
-    17: {'detail': 'An error occurred while executing user supplied JavaScript.',
+    17: {'detail': ('An error occurred while executing user supplied'
+                    ' JavaScript.'),
          'summary': 'JavaScriptError'},
-    19: {'detail': 'An error occurred while searching for an element by XPath.',
+    19: {'detail': ('An error occurred while searching for an element by'
+                    ' XPath.'),
          'summary': 'XPathLookupError'},
     21: {'detail': 'An operation did not complete before its timeout expired.',
          'summary': 'Timeout'},
-    23: {'detail': 'A request to switch to a different window could not be satisfied because the window could not be found.',
+    23: {'detail': ('A request to switch to a different window could not be'
+                    ' satisfied because the window could not be found.'),
          'summary': 'NoSuchWindow'},
-    24: {'detail': 'An illegal attempt was made to set a cookie under a different domain than the current page.',
+    24: {'detail': ('An illegal attempt was made to set a cookie under a '
+                    'different domain than the current page.'),
          'summary': 'InvalidCookieDomain'},
     25: {'detail': "A request to set a cookie's value could not be satisfied.",
          'summary': 'UnableToSetCookie'},
     26: {'detail': 'A modal dialog was open, blocking this operation',
          'summary': 'UnexpectedAlertOpen'},
-    27: {'detail': 'An attempt was made to operate on a modal dialog when one was not open.',
+    27: {'detail': ('An attempt was made to operate on a modal dialog when '
+                    'one was not open.'),
          'summary': 'NoAlertOpenError'},
     28: {'detail': 'A script did not complete before its timeout expired.',
          'summary': 'ScriptTimeout'},
-    29: {'detail': 'The coordinates provided to an interactions operation are invalid.',
+    29: {'detail': ('The coordinates provided to an interactions operation '
+                    'are invalid.'),
          'summary': 'InvalidElementCoordinates'},
     30: {'detail': 'IME was not available.', 'summary': 'IMENotAvailable'},
     31: {'detail': 'An IME engine could not be started.',
@@ -763,65 +801,86 @@ jsonwire_errors = {
 class WebDriverException(Exception):
     pass
 
+
 class NoSuchElement(WebDriverException):
     pass
+
 
 class NoSuchFrame(WebDriverException):
     pass
 
+
 class UnknownCommand(WebDriverException):
     pass
+
 
 class StaleElementReference(WebDriverException):
     pass
 
+
 class ElementNotVisible(WebDriverException):
     pass
+
 
 class InvalidElementState(WebDriverException):
     pass
 
+
 class UnknownError(WebDriverException):
     pass
+
 
 class ElementIsNotSelectable(WebDriverException):
     pass
 
+
 class JavaScriptError(WebDriverException):
     pass
+
 
 class XPathLookupError(WebDriverException):
     pass
 
+
 class Timeout(WebDriverException):
     pass
+
 
 class NoSuchWindow(WebDriverException):
     pass
 
+
 class InvalidCookieDomain(WebDriverException):
     pass
+
 
 class UnableToSetCookie(WebDriverException):
     pass
 
+
 class UnexpectedAlertOpen(WebDriverException):
     pass
+
 
 class NoAlertOpenError(WebDriverException):
     pass
 
+
 class ScriptTimeout(WebDriverException):
     pass
+
 
 class InvalidElementCoordinates(WebDriverException):
     pass
 
+
 class IMENotAvailable(WebDriverException):
     pass
 
+
 class IMEEngineActivationFailed(WebDriverException):
     pass
+
 
 class InvalidSelector(WebDriverException):
     pass
