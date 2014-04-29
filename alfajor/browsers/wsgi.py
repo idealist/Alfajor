@@ -86,6 +86,7 @@ class WSGI(DOMMixin):
         self.status = ''
         self.response = None
         self.headers = ()
+        self.current_timeout = 0
 
     def open(self, url, wait_for=None, timeout=0):
         """Open web page at *url*."""
@@ -140,6 +141,7 @@ class WSGI(DOMMixin):
                         path or '', bool(path), False, expires,
                         session, None, None, {}, False)
         self._cookie_jar.set_cookie(cookie)
+        return cookie
 
     def delete_cookie(self, name, domain=None, path=None):
         try:

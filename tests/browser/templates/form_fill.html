@@ -29,12 +29,12 @@
       </fieldset>
     </form>
 
-    <script type="text/javascript" src="/javascript/jquery-1.4.2.min.js">
+    <script type="text/javascript" src="/javascript/jquery-1.11.0.min.js">
       //
     </script>
     <script type="text/javascript">
       $('select[name="language"]').change(function() {
-        if ($('select[name="language"]').attr('value') == 'espa') {
+        if ($('select[name="language"]').val() == 'espa') {
           $('select[name="derivate"]').append('<option>None</option><option value="cast">Castechoto</option><option value="lunf">Lunfardo</option>');
          }
          else {
@@ -42,7 +42,7 @@
          }
       });
       $('select[name="derivate"]').change(function() {
-        if ($('select[name="derivate"]').attr('value') == 'lunf') {
+        if ($('select[name="derivate"]').val() == 'lunf') {
 
           $('select[name="subderivate"]').append('<option>None</option><option value="rosa">Rosaringazo</option>');
          }
