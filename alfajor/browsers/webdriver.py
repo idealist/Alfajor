@@ -480,8 +480,10 @@ def event_sender(name, default_wait_for=None):
     def handler(self, wait_for=default_wait_for, timeout=None):
         before_browser_activity.send(self.browser)
         if wait_for == 'page':
+            # set a flag on window which will be undefined once page reloads,
+            # signalling that page is ready
             self.browser.webdriver('POST', 'execute',
-                                   script='window.__page__ = true', args=[])
+                script='window.__alfajor_webdriver_page__ = true', args=[])
         element = self.wd_id()
         if 'doubleclick' in name:
             self.browser.webdriver('POST', 'moveto', element=element)
