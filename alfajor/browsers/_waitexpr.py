@@ -295,7 +295,11 @@ class WebDriverWaitExpression(WaitExpression):
         timeout = browser.current_timeout if timeout is None else timeout
         start_time = time.time()
         while True:
-            rv = self._expression(browser)
+            rv = None
+            try:
+                rv = self._expression(browser)
+            except AssertionError:
+                pass
             if rv:
                 return True
             if (time.time() - start_time) * 1000 >= timeout:
