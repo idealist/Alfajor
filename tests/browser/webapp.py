@@ -7,7 +7,8 @@
 import os
 import tempfile
 
-from werkzeug import Response, Request, SharedDataMiddleware, Template
+from jinja2 import Template
+from werkzeug import Response, Request, SharedDataMiddleware
 from werkzeug.exceptions import NotFound, HTTPException
 from werkzeug.routing import Map, Rule
 

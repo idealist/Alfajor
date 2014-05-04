@@ -90,6 +90,10 @@ class Selenium(DOMMixin):
         self.sync_document()
         after_page_load.send(self, url=url)
 
+    @property
+    def backend(self):
+        return self.selenium
+
     def reset(self):
         self.selenium('deleteAllVisibleCookies')
 
@@ -114,12 +118,14 @@ class Selenium(DOMMixin):
         return self.selenium('getLocation')
 
     def wait_for(self, condition, timeout=None):
+        in_expression = False
         try:
             if not condition:
                 return
             if condition == 'ajax':
                 condition = self.wait_expression(['ajax_complete'])
             if isinstance(condition, WaitExpression):
+                in_expression = True
                 condition = u'js:' + unicode(condition)
 
             if condition == 'duration':
@@ -134,7 +140,13 @@ class Selenium(DOMMixin):
                 expr = condition[3:]
                 js = ('var window = selenium.browserbot.getCurrentWindow(); ' +
                       expr)
-                self.selenium('waitForCondition', js, timeout)
+                try:
+                    self.selenium('waitForCondition', js, timeout)
+                    return True
+                except RuntimeError:
+                    if in_expression:
+                        return False
+                    raise
             elif condition.startswith('element:'):
                 expr = condition[8:]
                 self.selenium.wait_for_element_present(expr, timeout)
@@ -402,8 +414,8 @@ def type_text(element, text, wait_for=None, timeout=0, allow_newlines=False):
         selenium.key_down(locator, char)
         # Most browsers do not allow events to do the actual typing,
         # so we need to set the value
-        if element.browser.user_agent['browser'] != 'firefox':
-            selenium.type(locator, field_value)
+        #if element.browser.user_agent['browser'] != 'firefox':
+        selenium.type(locator, field_value)
         selenium.key_press(locator, char)
         selenium.key_up(locator, char)
     if wait_for and timeout:

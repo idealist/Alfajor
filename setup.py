@@ -88,8 +88,10 @@ setup(name="alfajor",
 
       install_requires=[
         'Werkzeug >= 0.6',
+        'jinja2',
         'lxml',
         'blinker',
+        'requests',
         ],
 
       tests_require=[

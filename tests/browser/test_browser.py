@@ -23,8 +23,8 @@ def test_simple():
 
     # This is generally not a safe assertion... the browser could (and does)
     # normalize the returned html in some fashion.
-    assert browser.response.lower().replace('\r\n', '') == (
-            '<html><head></head><body><p>hi there</p></body></html>')
+    html = browser.response.lower().replace('\r\n', '')
+    assert '<head></head><body><p>hi there</p></body>' in html
 
     assert browser.document.cssselect('p')[0].text == 'hi there'
 
@@ -129,7 +129,7 @@ def test_wait_for():
 
 @browser_test()
 def test_wait_for_duration():
-    if 'selenium' in browser.capabilities:
+    if 'javascript' in browser.capabilities:
         start = time.time()
         browser.open('/waitfor', wait_for='duration', timeout=1000)
         duration = time.time() - start
@@ -138,7 +138,7 @@ def test_wait_for_duration():
 
 @browser_test()
 def test_wait_for_element():
-    if 'selenium' in browser.capabilities:
+    if 'javascript' in browser.capabilities:
         browser.open('/waitfor')
         browser.cssselect('a#appender')[0].click(
             wait_for='element:css=#expected_p', timeout=3000)
@@ -148,7 +148,7 @@ def test_wait_for_element():
 @browser_test()
 @raises(AssertionError)
 def test_wait_for_element_not_found():
-    if 'selenium' in browser.capabilities:
+    if 'javascript' in browser.capabilities:
         browser.open('/waitfor')
         browser.wait_for('element:css=#unexisting', timeout=10)
     else:
@@ -157,7 +157,7 @@ def test_wait_for_element_not_found():
 
 @browser_test()
 def test_wait_for_element_not_present():
-    if 'selenium' in browser.capabilities:
+    if 'javascript' in browser.capabilities:
         browser.open('/waitfor')
         assert browser.cssselect('#removeme')
         browser.cssselect('#remover')[0].click(
@@ -167,7 +167,7 @@ def test_wait_for_element_not_present():
 
 @browser_test()
 def test_wait_for_ajax():
-    if 'selenium' in browser.capabilities:
+    if 'javascript' in browser.capabilities:
         browser.open('/waitfor')
         browser.cssselect('#ajaxappender')[0].click(
             wait_for='ajax', timeout=3000)
@@ -176,16 +176,16 @@ def test_wait_for_ajax():
 
 @browser_test()
 def test_wait_for_postajax():
-    if 'selenium' in browser.capabilities:
+    if 'javascript' in browser.capabilities:
         browser.open('/waitfor')
         browser.cssselect('#ajaxappender')[0].click(
             wait_for='postajax', timeout=3000)
-        assert len(browser.cssselect('.ajaxAdded')) == 4
+        assert len(browser.cssselect('.ajaxAdded')) == 3
 
 
 @browser_test()
 def test_wait_for_js():
-    if 'selenium' in browser.capabilities:
+    if 'javascript' in browser.capabilities:
         browser.open('/waitfor')
         browser.cssselect('#counter')[0].click(
             wait_for='js:window.exampleCount==100;', timeout=3000)
@@ -197,7 +197,8 @@ def test_set_cookie():
         browser.open('/')
 
         browser.set_cookie('foo', 'bar')
-        browser.set_cookie('py', 'py', 'localhost.local', port='8008')
+        domain, port = browser.location.split('/')[2].split(':', 1)
+        c = browser.set_cookie('py', 'py', domain=domain, port=port)
         browser.set_cookie('green', 'frog',
                            session=False, expires=time.time() + 3600)
         assert 'foo' in browser.cookies
@@ -212,3 +213,6 @@ def test_screenshot():
         return
     browser.open('http://www.google.com')
     assert False
+
+
+## TODO: test browser.selenium.run_script()
