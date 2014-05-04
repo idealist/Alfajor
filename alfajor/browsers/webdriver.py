@@ -110,6 +110,10 @@ class WebDriver(DOMMixin):
     def backend(self):
         return self.webdriver
 
+    @property
+    def current_timeout(self):
+        return self.webdriver._current_timeout
+
     def reset(self):
         self.webdriver('DELETE', 'cookie')
 
@@ -132,44 +136,40 @@ class WebDriver(DOMMixin):
         return self.webdriver('GET', 'url')['value']
 
     def wait_for(self, condition, timeout=None, frequency=None):
+        wd = self.webdriver
         try:
             if not condition:
                 return
+            if timeout is None:
+                timeout = self.current_timeout
             if condition == 'page':
-                condition = u'js:return window.__page__ === undefined'
+                condition = self.wait_expression().page_ready()
             if condition == 'ajax':
-                condition = self.wait_expression(['ajax_complete'])
+                condition = self.wait_expression().ajax_complete()
             if isinstance(condition, WaitExpression):
-                condition = u'js:' + unicode(condition)
+                return condition(self, timeout=timeout)
 
-            if condition.startswith('duration:'):
-                timeout = int(condition.split(':', 1)[1])
-                condition = 'duration'
-            if condition == 'duration':
+            if condition.startswith('duration'):
+                if ':' in condition:
+                    timeout = int(condition.split(':', 1)[1])
                 if timeout:
                     time.sleep(timeout / 1000.0)
                 return
-            if timeout is None:
-                timeout = self.webdriver._current_timeout
             if condition.startswith('js:'):
                 js = condition[3:]
-                self.webdriver.wait_for_condition(js, timeout, frequency)
+                return wd.wait_for_condition(js, timeout, frequency)
             elif condition.startswith('element:'):
                 expr = condition[8:]
-                self.webdriver.wait_for_element_present(expr, timeout,
-                                                        frequency)
+                return wd.wait_for_element_present(expr, timeout, frequency)
             elif condition.startswith('!element:'):
                 expr = condition[9:]
-                self.webdriver.wait_for_element_not_present(expr, timeout,
-                                                            frequency)
+                return wd.wait_for_element_not_present(expr, timeout, frequency)
             elif condition.startswith('visible:'):
                 expr = condition[8:]
-                self.webdriver.wait_for_element_visible(expr, timeout,
-                                                        frequency)
+                return wd.wait_for_element_visible(expr, timeout, frequency)
             elif condition.startswith('!visible:'):
                 expr = condition[9:]
-                self.webdriver.wait_for_element_invisible(expr, timeout,
-                                                          frequency)
+                return wd.wait_for_element_invisible(expr, timeout, frequency)
 
         except RuntimeError, detail:
             raise AssertionError(
@@ -352,65 +352,82 @@ class WebDriverRemote(object):
         while(True):
             result = operation()
             if result:
-                return
+                return result
             time.sleep(frequency)
             if time.time() > end_time:
                 break
-        raise Exception('timeout')
+        # The selenium browser raises AssertionError
+        raise AssertionError('timeout')
 
     def wait_for_condition(self, expression, timeout=None, frequency=None):
-        operation = lambda: self('POST', 'execute', script=expression,
+        script = "return (function() { var value = %s; return value; })()"
+        operation = lambda: self('POST', 'execute', script=script % expression,
                                  args=[])['value']
-        self._exec_with_timeout(operation, timeout, frequency)
+        return self._exec_with_timeout(operation, timeout, frequency)
+
+    def _to_locator(self, expression):
+        if '=' in expression:
+            strategy, value = expression.split('=', 1)
+            # others?
+            if strategy == 'css':
+                strategy = 'css selector'
+        else:
+            strategy = 'xpath'
+            value = expression
+        return strategy, value
 
     def wait_for_element_present(self, expression, timeout=None,
                                  frequency=None):
         def _find_element(driver):
             try:
-                driver('POST', 'element', using='xpath', value=expression)
+                strategy, value = self._to_locator(expression)
+                driver('POST', 'element', using=strategy, value=value)
                 return True
             except NoSuchElement:
                 return False
         operation = lambda: _find_element(self)
-        self._exec_with_timeout(operation, timeout, frequency)
+        return self._exec_with_timeout(operation, timeout, frequency)
 
     def wait_for_element_not_present(self, expression, timeout=None,
                                      frequency=None):
         def _find_element(driver):
             try:
-                driver('POST', 'element', using='xpath', value=expression)
+                strategy, value = self._to_locator(expression)
+                driver('POST', 'element', using=strategy, value=value)
                 return False
             except NoSuchElement:
                 return True
         operation = lambda: _find_element(self)
-        self._exec_with_timeout(operation, timeout, frequency)
+        return self._exec_with_timeout(operation, timeout, frequency)
 
     def wait_for_element_visible(self, expression, timeout=None,
                                  frequency=None):
         def _element_visible(driver):
             try:
-                el = driver('POST', 'element', using='xpath',
-                            value=expression)['value']['ELEMENT']
+                strategy, value = self._to_locator(expression)
+                el = driver('POST', 'element', using=strategy, value=value
+                            )['value']['ELEMENT']
                 displayed = driver('GET', 'element/%s/displayed' % el)['value']
                 return displayed
             except ElementNotVisible:
                 return False
         operation = lambda: _element_visible(self)
-        self._exec_with_timeout(operation, timeout, frequency)
+        return self._exec_with_timeout(operation, timeout, frequency)
 
     def wait_for_element_invisible(self, expression, timeout=None,
                                    frequency=None):
         def _element_visible(driver):
             try:
-                el = driver('POST', 'element', using='xpath',
-                            value=expression)['value']['ELEMENT']
+                strategy, value = self._to_locator(expression)
+                el = driver('POST', 'element', using=strategy, value=value
+                            )['value']['ELEMENT']
                 displayed = driver('GET', 'element/%s/displayed' % el)['value']
                 return not displayed
             except ElementNotVisible:
                 # if an element doesn't exist, it's invisible, right? or raise?
                 return True
         operation = lambda: _element_visible(self)
-        self._exec_with_timeout(operation, timeout, frequency)
+        return self._exec_with_timeout(operation, timeout, frequency)
 
     @contextmanager
     def _scoped_timeout(self, timeout):
