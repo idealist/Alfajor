@@ -278,10 +278,8 @@ class WebDriverWaitExpression(WaitExpression):
 
     ajax_pending_expr = ('window.jQuery && window.jQuery.active != 0;')
     ajax_complete_expr = ('window.jQuery && window.jQuery.active == 0;')
-    page_loading_expr = ('window.jQuery && '
-                         'window.jQuery.ready.promise().state() != "resolved";')
-    page_ready_expr = ('window.jQuery === undefined || '
-                       'window.jQuery.ready.promise().state() == "resolved";')
+    page_loading_expr = ('window.__alfajor_webdriver_page__ === true')
+    page_ready_expr = ('window.__alfajor_webdriver_page__ === undefined')
 
     def __init__(self, *expressions, **kw):
         clauses = [self.wait_clause_factory(e) for e in expressions]
