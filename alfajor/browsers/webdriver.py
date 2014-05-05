@@ -272,15 +272,6 @@ class WebDriverRemote(object):
     testComplete = test_complete
 
     def _raw_call(self, method, command, *args, **kw):
-        #transform = _transformers[kw.pop('transform', 'unicode')]
-        #return_list = kw.pop('list', False)
-        #return_dict = kw.pop('dict', False)
-        #assert not kw, 'Unknown keyword argument.'
-
-        #payload = {'cmd': command, 'sessionId': self._session_id}
-        #for idx, arg in enumerate(args):
-        #    payload[str(idx + 1)] = arg
-
         logger.debug('webdriver(%s, %r, %r)', command, args, kw)
         response = self._req_session.request(method,
                                              self._server_url + '/' + command,
