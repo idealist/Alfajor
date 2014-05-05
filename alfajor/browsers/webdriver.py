@@ -356,9 +356,11 @@ class WebDriverRemote(object):
                                  args=[])['value']
         return self._exec_with_timeout(operation, timeout, frequency)
 
+    _locator_re = re.compile('(\w+?)=(.+)')
     def _to_locator(self, expression):
-        if '=' in expression:
-            strategy, value = expression.split('=', 1)
+        match = self._locator_re.match(expression)
+        if match:
+            strategy, value = match.groups()
             # others?
             if strategy == 'css':
                 strategy = 'css selector'
