@@ -591,7 +591,10 @@ class DOMElement(DOMElement):
 
     @property
     def is_visible(self):
-        return self.browser.selenium.is_visible(self._locator)
+        if not self.browser.selenium.is_visible(self._locator):
+            return False
+        return all([self.browser.selenium.is_visible(e._locator)
+                    for e in self.iterancestors()])
 
 
 selenium_elements = {

@@ -732,11 +732,14 @@ class DOMElement(DOMElement):
         self.browser.webdriver('fireEvent', self._locator, name)
         after_browser_activity.send(self.browser)
 
-    @property
-    def is_visible(self):
+    def _is_visible(self):
         return self.browser.webdriver('GET',
                                       'element/%s/displayed' % self.wd_id()
                                       )['value']
+
+    @property
+    def is_visible(self):
+        return all([e._is_visible() for e in self.iterancestors()])
 
 
 webdriver_elements = {
