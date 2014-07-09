@@ -45,17 +45,17 @@ from alfajor._compat import property
 # httplib.HTTPConnection.debuglevel = 1
 
 
-logging.basicConfig()  # you need to initialize logging, otherwise you
-                       # will not see anything from requests
-logging.getLogger().setLevel(logging.DEBUG)
-requests_log = logging.getLogger("requests.packages.urllib3")
-requests_log.setLevel(logging.DEBUG)
-requests_log.propagate = True
+# logging.basicConfig()  # you need to initialize logging, otherwise you
+#                        # will not see anything from requests
+# logging.getLogger().setLevel(logging.DEBUG)
+# requests_log = logging.getLogger("requests.packages.urllib3")
+# requests_log.setLevel(logging.DEBUG)
+# requests_log.propagate = True
 
 
 __all__ = ['WebDriver']
 logger = logging.getLogger('tests.browser')
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
 logger.propagate = True
 
 
