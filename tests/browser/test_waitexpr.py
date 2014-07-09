@@ -82,17 +82,17 @@ def test_webdriver_wait_expression_simple_and():
           .element_present('#id2', retval=True)
           )
     assert we(browser)
-    assert browser.call_log == ['element:#id1', 'element:#id2']
+    assert browser.call_log == ['element:css=#id1', 'element:css=#id2']
 
 
-def test_webdriver_wait_expression_simple_and():
+def test_webdriver_wait_expression_simple_and_visible():
     browser = MockBrowser()
     we = (WDWExp()
-          .element_present('#id1', retval=True)
-          .element_present('#id2', retval=True)
+          .element_visible('#id1', retval=True)
+          .element_not_visible('#id2', retval=True)
           )
     assert we(browser)
-    assert browser.call_log == ['element:#id1', 'element:#id2']
+    assert browser.call_log == ['visible:css=#id1', '!visible:css=#id2']
 
 
 def test_webdriver_wait_expression_simple_and_2():
@@ -102,7 +102,7 @@ def test_webdriver_wait_expression_simple_and_2():
           .element_present('#id2', retval=True)
           )
     assert not we(browser)
-    assert browser.call_log == ['element:#id1']
+    assert browser.call_log == ['element:css=#id1']
 
 
 def test_webdriver_wait_expression_simple_or():
@@ -113,7 +113,7 @@ def test_webdriver_wait_expression_simple_or():
           .element_present('#id2', retval=True)
           )
     assert we(browser)
-    assert browser.call_log == ['element:#id1', 'element:#id2']
+    assert browser.call_log == ['element:css=#id1', 'element:css=#id2']
 
 
 def test_webdriver_wait_expression_compound():
@@ -125,7 +125,7 @@ def test_webdriver_wait_expression_compound():
           .element_not_present('#id3', retval=False)
           )
     assert not we(browser)
-    assert browser.call_log == ['element:#id1', '!element:#id3']
+    assert browser.call_log == ['element:css=#id1', '!element:css=#id3']
 
 
 def test_Webdriver_wait_expression_compound_2():
@@ -137,7 +137,7 @@ def test_Webdriver_wait_expression_compound_2():
           .element_not_present('#id3', retval=True)
           )
     assert we(browser)
-    assert browser.call_log == ['element:#id1', 'element:#id2', '!element:#id3']
+    assert browser.call_log == ['element:css=#id1', 'element:css=#id2', '!element:css=#id3']
 
 
 def test_Webdriver_wait_expression_compound_3():
@@ -149,7 +149,7 @@ def test_Webdriver_wait_expression_compound_3():
           .element_not_present('#id3', retval=True)
           )
     assert we(browser)
-    assert browser.call_log == ['element:#id1', '!element:#id3']
+    assert browser.call_log == ['element:css=#id1', '!element:css=#id3']
 
 
 @browser_test()
