@@ -739,7 +739,10 @@ class DOMElement(DOMElement):
 
     @property
     def is_visible(self):
-        return all([e._is_visible() for e in self.iterancestors()])
+        if self._is_visible():
+            return all([e._is_visible() for e in self.iterancestors()])
+        else:
+            return False
 
 
 webdriver_elements = {
