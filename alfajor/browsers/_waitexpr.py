@@ -7,6 +7,7 @@
 """Compound wait_for expression support."""
 
 import operator
+import re
 import time
 
 __all__ = 'WaitExpression', 'SeleniumWaitExpression', 'WebDriverWaitExpression'
@@ -61,6 +62,22 @@ class WaitExpression(object):
 
     def element_not_present(self, expr):
         """True if *finder* is not present on the page.
+
+        :param finder: a CSS selector or document element instance
+
+        """
+        return self
+
+    def element_visible(self, finder):
+        """True if *finder* is visible.
+
+        :param finder: a CSS selector or document element instance
+
+        """
+        return self
+
+    def element_not_visible(self, expr):
+        """True if *finder* is not visible.
 
         :param finder: a CSS selector or document element instance
 
@@ -133,6 +150,16 @@ class SeleniumWaitExpression(WaitExpression):
         self._expressions.append(js)
         return self
 
+    def element_visible(self, finder):
+        js = self._is_element_visible('element_visible', finder, 'true')
+        self._expressions.append(js)
+        return self
+
+    def element_not_visible(self, finder):
+        js = self._is_element_visible('element_not_visible', finder, 'false')
+        self._expressions.append(js)
+        return self
+
     def evaluate_element(self, finder, expr, ref=None, predicate=None):
         locator = self.to_locator(finder)
         if ref is not None:
@@ -195,6 +222,21 @@ class SeleniumWaitExpression(WaitExpression):
   %s
   return found == %s;
 })()""" % (js_quote(locator), log, result)
+
+    def _is_element_visible(self, label, finder, result):
+        locator = self.to_locator(finder)
+        log = self.evaluation_log(label, 'visible', locator)
+        return u"""
+(function() {
+    var visible;
+    try {
+        visible = selenium.isVisible("%s");
+    } catch(e) {
+        visible = false;
+    }
+    return visible == %s;
+})()
+""" % (js_quote(locator), result)
 
     def __unicode__(self):
         last = None
@@ -316,11 +358,23 @@ class WebDriverWaitExpression(WaitExpression):
             self._expression = AndExpression(self._expression)
 
     def element_present(self, expr, **kw):
-        self._append(self.wait_clause_factory('element:' + expr, **kw))
+        locator = self._to_locator(expr)
+        self._append(self.wait_clause_factory('element:' + locator, **kw))
         return self
 
     def element_not_present(self, expr, **kw):
-        self._append(self.wait_clause_factory('!element:' + expr, **kw))
+        locator = self._to_locator(expr)
+        self._append(self.wait_clause_factory('!element:' + locator, **kw))
+        return self
+
+    def element_visible(self, expr, **kw):
+        locator = self._to_locator(expr)
+        self._append(self.wait_clause_factory('visible:' + locator, **kw))
+        return self
+
+    def element_not_visible(self, expr, **kw):
+        locator = self._to_locator(expr)
+        self._append(self.wait_clause_factory('!visible:' + locator, **kw))
         return self
 
     def page_ready(self, **kw):
@@ -360,6 +414,18 @@ class WebDriverWaitExpression(WaitExpression):
 
     def evaluation_log(self, *args, **kw):
         return ''
+
+    _locator_re = re.compile('(\w+?)=(.+)')
+
+    def _to_locator(self, expression):
+        """When given element, return its locator; else default to css"""
+        if hasattr(expression, '_locator'):
+            return expression._locator
+        match = self._locator_re.match(expression)
+        if match:
+            return expression
+        else:
+            return 'css=%s' % expression
 
     def to_element(self, expr, browser):
         """Convert a css selector to a document element."""
