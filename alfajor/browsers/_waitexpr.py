@@ -420,7 +420,7 @@ class WebDriverWaitExpression(WaitExpression):
     def _to_locator(self, expression):
         """When given element, return its locator; else default to css"""
         if hasattr(expression, '_locator'):
-            return expression._locator
+            return '='.join(expression._locator)
         match = self._locator_re.match(expression)
         if match:
             return expression
