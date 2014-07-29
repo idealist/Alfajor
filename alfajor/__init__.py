@@ -10,4 +10,4 @@ from alfajor._management import APIClient, WebBrowser
 
 
 __all__ = ['APIClient', 'WebBrowser']
-__version__ = '0.3.3'
+__version__ = '0.3.4'
