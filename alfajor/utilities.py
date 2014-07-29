@@ -174,7 +174,7 @@ class ServerSubProcess(object):
     def start(self):
         """Start the process."""
         import shlex
-        from subprocess import Popen, PIPE, STDOUT
+        from subprocess import Popen
 
         if self.process:
             raise RuntimeError("Process already started.")
@@ -186,7 +186,8 @@ class ServerSubProcess(object):
             cmd = shlex.split(self.cmd)
         else:
             cmd = self.cmd
-        process = Popen(cmd, stdout=PIPE, stderr=STDOUT, close_fds=True)
+        self.null = open('/dev/null', 'w')
+        process = Popen(cmd, stdout=self.null, stderr=self.null, close_fds=True)
 
         if not self.host:
             time.sleep(0.35)
@@ -225,6 +226,7 @@ class ServerSubProcess(object):
             except AttributeError:
                 import os
                 os.kill(self.process.pid, signal.SIGKILL)
+        self.null.close()
         self.process = None
 
     def network_ping(self):

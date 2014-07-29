@@ -42,6 +42,8 @@ __all__ = ['Selenium']
 logger = getLogger('tests.browser')
 after_browser_activity = signal('after_browser_activity')
 before_browser_activity = signal('before_browser_activity')
+after_page_load = signal('after_page_load')
+before_page_load = signal('before_page_load')
 _enterable_chars_re = re.compile(r'(\\[a-z]|\\\d+|.)')
 csv.register_dialect('cookies', delimiter=';',
                      skipinitialspace=True,
@@ -60,7 +62,7 @@ class Selenium(DOMMixin):
     wait_expression = SeleniumWaitExpression
 
     def __init__(self, server_url, browser_cmd, base_url=None,
-                 default_timeout=16000):
+                 default_timeout=16000, **kw):
         self.selenium = SeleniumRemote(
             server_url, browser_cmd, default_timeout)
         self._base_url = base_url
@@ -69,10 +71,12 @@ class Selenium(DOMMixin):
         self.status = ''
         self.response = None
         self.headers = {}
+        self.wait_expression = kw.pop('wait_expression', self.wait_expression)
 
     def open(self, url, wait_for='page', timeout=None):
         logger.info('open(%s)', url)
         before_browser_activity.send(self)
+        before_page_load.send(self, url=url)
         if self._base_url:
             url = urljoin(self._base_url, url)
         if not self.selenium._session_id:
@@ -82,8 +86,13 @@ class Selenium(DOMMixin):
         self.selenium.open(url, timeout)
         if wait_for != 'page':
             self.wait_for(wait_for, timeout)
-        after_browser_activity.send(self)
+        after_browser_activity.send(self, url=url)
         self.sync_document()
+        after_page_load.send(self, url=url)
+
+    @property
+    def backend(self):
+        return self.selenium
 
     def reset(self):
         self.selenium('deleteAllVisibleCookies')
@@ -99,7 +108,8 @@ class Selenium(DOMMixin):
             'version': ua.version,
             }
 
-    def sync_document(self):
+    def sync_document(self, wait_for=None, timeout=None):
+        self.wait_for(wait_for, timeout)
         self.response = '<html>' + self.selenium('getHtmlSource') + '</html>'
         self.__dict__.pop('document', None)
 
@@ -108,10 +118,14 @@ class Selenium(DOMMixin):
         return self.selenium('getLocation')
 
     def wait_for(self, condition, timeout=None):
+        in_expression = False
         try:
             if not condition:
                 return
+            if condition == 'ajax':
+                condition = self.wait_expression(['ajax_complete'])
             if isinstance(condition, WaitExpression):
+                in_expression = True
                 condition = u'js:' + unicode(condition)
 
             if condition == 'duration':
@@ -122,15 +136,17 @@ class Selenium(DOMMixin):
                 timeout = self.selenium._current_timeout
             if condition == 'page':
                 self.selenium('waitForPageToLoad', timeout)
-            elif condition == 'ajax':
-                js = ('selenium.browserbot.getCurrentWindow()'
-                      '.jQuery.active == 0;')
-                self.selenium('waitForCondition', js, timeout)
             elif condition.startswith('js:'):
                 expr = condition[3:]
                 js = ('var window = selenium.browserbot.getCurrentWindow(); ' +
                       expr)
-                self.selenium('waitForCondition', js, timeout)
+                try:
+                    self.selenium('waitForCondition', js, timeout)
+                    return True
+                except RuntimeError:
+                    if in_expression:
+                        return False
+                    raise
             elif condition.startswith('element:'):
                 expr = condition[8:]
                 self.selenium.wait_for_element_present(expr, timeout)
@@ -222,7 +238,9 @@ class SeleniumRemote(object):
 
             if rows:
                 return dict(
-                    map(lambda x: x.strip('"'), x.split('=')) for x in rows[0])
+                    # Transform mycookie="abc=def" into ['mycookie', 'abc=def']
+                    map(lambda x: x.strip('"'), x.split('=', 1))
+                        for x in rows[0])
             else:
                 return {}
         else:
@@ -396,8 +414,8 @@ def type_text(element, text, wait_for=None, timeout=0, allow_newlines=False):
         selenium.key_down(locator, char)
         # Most browsers do not allow events to do the actual typing,
         # so we need to set the value
-        if element.browser.user_agent['browser'] != 'firefox':
-            selenium.type(locator, field_value)
+        #if element.browser.user_agent['browser'] != 'firefox':
+        selenium.type(locator, field_value)
         selenium.key_press(locator, char)
         selenium.key_up(locator, char)
     if wait_for and timeout:
@@ -419,8 +437,25 @@ class InputElement(InputElement):
     @value.setter
     def value(self, value):
         if self.checkable:
-            # doesn't seem possible to mutate these values via selenium
-            pass
+            group = self.form['input[name=%s]' % self.name]
+            if self.type == 'radio':
+                target = self.form.cssselect(
+                    'input[name=%s][value=%s]' % (self.name, value))
+                if target:
+                    target[0].checked = True
+            if self.type == 'checkbox':
+                if len(group) > 1:
+                    if isinstance(value, basestring):
+                        discriminator = lambda i, v: i.value == value
+                    else:
+                        discriminator = lambda i, v: i.value in value
+                    for input in group:
+                        if discriminator(input.value, value):
+                            input.checked = True
+                        else:
+                            input.checked = False
+                elif len(group) == 1:
+                    self.checked = bool(value)
         else:
             self.attrib['value'] = value
             self.browser.selenium('type', self._locator, value)
@@ -467,6 +502,9 @@ class InputElement(InputElement):
             else:
                 self.browser.selenium('uncheck', self._locator)
                 self.attrib.pop('checked', None)
+        # XXX:eo selenium doesn't necessarily trigger this event for us,
+        # so do it manually
+        self.fire_event('change')
 
     def set(self, key, value):
         if key != 'checked':
@@ -553,7 +591,10 @@ class DOMElement(DOMElement):
 
     @property
     def is_visible(self):
-        return self.browser.selenium.is_visible(self._locator)
+        if not self.browser.selenium.is_visible(self._locator):
+            return False
+        return all([self.browser.selenium.is_visible(e._locator)
+                    for e in self.iterancestors()])
 
 
 selenium_elements = {

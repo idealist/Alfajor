@@ -25,6 +25,7 @@ _default_logger = getLogger('alfajor')
 managers = {
     'browser': {
         'selenium': 'alfajor.browsers.managers:SeleniumManager',
+        'webdriver': 'alfajor.browsers.managers:WebDriverManager',
         'wsgi': 'alfajor.browsers.managers:WSGIManager',
         'network': 'alfajor.browsers.managers:NetworkManager',
         'zero': 'alfajor.browsers.managers:ZeroManager',
@@ -158,6 +159,7 @@ class _ManagerFactory(object):
         backend_name = self._get_backend_name(frontend_name)
         tool = self.declaration.tool
 
+        print "Load %s %s %s" % (frontend_name, backend_name, tool)
         try:
             manager_factory = self._load_backend(tool, backend_name)
         except KeyError:

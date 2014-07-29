@@ -13,6 +13,8 @@ include
 lib
 dist
 build
+*~
+*.local.ini
 
 docs/text
 docs/html

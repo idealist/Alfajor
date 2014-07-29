@@ -8,7 +8,7 @@
 
 from logging import getLogger
 
-from alfajor.utilities import ServerSubProcess, eval_dotted_path
+from alfajor.utilities import ServerSubProcess, eval_dotted_path, lazy_property
 
 
 logger = getLogger('alfajor')
@@ -54,9 +54,11 @@ class SeleniumManager(object):
             return default[0]
         raise LookupError(key)
 
-    def create(self):
+    def browser_factory(self, selenium_server, base_url, **kw):
         from alfajor.browsers.selenium import Selenium
+        return Selenium(selenium_server, self.browser_type, base_url, **kw)
 
+    def create(self):
         base_url = self.server_url
         if (self._config('without_server', False) or
             not self._config('cmd', False)):
@@ -67,13 +69,18 @@ class SeleniumManager(object):
             logger.debug("Service started.")
         selenium_server = self._config('selenium-server',
                                        'http://localhost:4444')
-        self.browser = Selenium(selenium_server, self.browser_type, base_url)
+        waitexpr = self._config('wait-expression', None)
+        kw = {}
+        if waitexpr:
+            kw = {'wait_expression': eval_dotted_path(waitexpr)}
+
+        self.browser = self.browser_factory(selenium_server, base_url, **kw)
         return self.browser
 
     def destroy(self):
-        if self.browser and self.browser.selenium._session_id:
+        if self.browser and self.browser.backend._session_id:
             try:
-                self.browser.selenium.test_complete()
+                self.browser.backend.test_complete()
             except (KeyboardInterrupt, SystemExit):
                 raise
             except:
@@ -92,6 +99,14 @@ class SeleniumManager(object):
         process = ServerSubProcess(cmd, ping)
         process.start()
         return process
+
+
+class WebDriverManager(SeleniumManager):
+
+    def browser_factory(self, selenium_server, base_url, **kw):
+        from alfajor.browsers.webdriver import WebDriver
+        caps = {'browserName': self.browser_type}
+        return WebDriver(selenium_server, caps, base_url, **kw)
 
 
 class WSGIManager(object):
